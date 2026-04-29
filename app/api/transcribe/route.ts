@@ -31,10 +31,10 @@ export async function POST(request: Request) {
     const ext = cleanMime.includes('mp4') ? 'mp4' : cleanMime.includes('ogg') ? 'ogg' : 'webm';
     const namedFile = new File([audioFile], `recording.${ext}`, { type: cleanMime });
 
-    // 1. Transcribe with Groq Whisper Large v3
+    // 1. Transcribe with Groq Whisper Large v3 Turbo (8x faster than v3, same quality)
     const transcription = await groq.audio.transcriptions.create({
       file: namedFile,
-      model: 'whisper-large-v3',
+      model: 'whisper-large-v3-turbo',
       response_format: 'verbose_json',
     });
 
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     let formattedText = rawText;
     try {
       const completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-8b-instant', // sufficient for punctuation/paragraphs, 10x faster than 70b
         messages: [
           {
             role: 'system',
