@@ -1,8 +1,11 @@
-'use client';
+﻿'use client';
 
 import { useState, useRef, useCallback } from 'react';
 
 type RecorderState = 'idle' | 'recording' | 'processing' | 'done' | 'error';
+
+/** Corta la grabacion en chunks de 1 minuto para transcripcion en paralelo */
+const CHUNK_MS = 60_000;
 
 function getSupportedMimeType(): string {
   const candidates = [
@@ -12,9 +15,7 @@ function getSupportedMimeType(): string {
     'audio/ogg;codecs=opus',
   ];
   for (const type of candidates) {
-    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)) {
-      return type;
-    }
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)) return type;
   }
   return 'audio/webm';
 }
@@ -29,76 +30,146 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
   const [state, setState] = useState<RecorderState>('idle');
   const [duration, setDuration] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
+  const [liveText, setLiveText] = useState('');
 
   const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const isRecordingRef = useRef(false);
+  const contextRef = useRef('');        // ultimas 150 palabras -> prompt Whisper siguiente chunk
+  const rawChunksRef = useRef<string[]>([]);
+  const totalDurationRef = useRef(0);
+  const languageRef = useRef('unknown');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const chunkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+
+  // Ref para evitar dependencia circular entre startChunk y finalizeTranscription
+  const startChunkRef = useRef<() => void>(() => {});
+
+  const finalizeTranscription = useCallback(async () => {
+    const fullText = rawChunksRef.current.join(' ').trim();
+    if (!fullText) {
+      setErrorMsg('No se detectó audio en la grabación');
+      setState('error');
+      return;
+    }
+    try {
+      const res = await fetch('/api/transcriptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rawText: fullText,
+          language: languageRef.current,
+          durationSeconds: totalDurationRef.current,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Error al guardar');
+      }
+      setState('done');
+      setLiveText('');
+      rawChunksRef.current = [];
+      onDoneRef.current();
+      setTimeout(() => { setState('idle'); setDuration(0); }, 2500);
+    } catch (err) {
+      setErrorMsg((err as Error).message || 'Error al guardar');
+      setState('error');
+    }
+  }, []);
+
+  // Definido como ref para llamarse recursivamente sin dependencias circulares
+  startChunkRef.current = () => {
+    if (!streamRef.current || !isRecordingRef.current) return;
+
+    const mimeType = getSupportedMimeType();
+    const recorder = new MediaRecorder(streamRef.current, {
+      mimeType,
+      audioBitsPerSecond: 16_000,
+    });
+    const chunks: Blob[] = [];
+
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+
+    recorder.onstop = async () => {
+      const audioBlob = new Blob(chunks, { type: recorder.mimeType });
+      const cleanMime = recorder.mimeType.split(';')[0];
+      const ext = cleanMime.includes('mp4') ? 'mp4' : cleanMime.includes('ogg') ? 'ogg' : 'webm';
+
+      const form = new FormData();
+      form.append('audio', audioBlob, `chunk.${ext}`);
+      form.append('mimeType', recorder.mimeType);
+      if (contextRef.current) form.append('prompt', contextRef.current);
+
+      try {
+        const res = await fetch('/api/transcribe', { method: 'POST', body: form });
+        if (res.ok) {
+          const data: { rawText: string; language: string; duration: number } = await res.json();
+          if (data.rawText) {
+            rawChunksRef.current.push(data.rawText);
+            totalDurationRef.current += data.duration ?? 0;
+            if (languageRef.current === 'unknown') languageRef.current = data.language ?? 'unknown';
+            const allText = rawChunksRef.current.join(' ');
+            // Mantener contexto: ultimas 150 palabras para el proximo chunk
+            contextRef.current = allText.split(' ').slice(-150).join(' ');
+            setLiveText(allText);
+          }
+        }
+      } catch {
+        // silencioso: el chunk se pierde pero la grabacion continua
+      }
+
+      if (isRecordingRef.current) {
+        startChunkRef.current(); // siguiente chunk inmediatamente
+      } else {
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        await finalizeTranscription();
+      }
+    };
+
+    recorderRef.current = recorder;
+    recorder.start(500);
+
+    // Cortar automaticamente cada CHUNK_MS
+    chunkTimerRef.current = setTimeout(() => {
+      if (recorder.state === 'recording') recorder.stop();
+    }, CHUNK_MS);
+  };
 
   const startRecording = useCallback(async () => {
     setErrorMsg('');
+    setLiveText('');
+    rawChunksRef.current = [];
+    totalDurationRef.current = 0;
+    languageRef.current = 'unknown';
+    contextRef.current = '';
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = getSupportedMimeType();
-
-      const recorder = new MediaRecorder(stream, {
-        mimeType,
-        audioBitsPerSecond: 16_000, // 16kbps es suficiente para voz
-      });
-
-      chunksRef.current = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
-      recorder.onstop = async () => {
-        setState('processing');
-        try {
-          const recorderMime = recorder.mimeType;
-          const ext = recorderMime.includes('mp4') ? 'mp4' : recorderMime.includes('ogg') ? 'ogg' : 'webm';
-          const audioBlob = new Blob(chunksRef.current, { type: recorderMime });
-
-          // Envío directo como FormData — sin pasar por almacenamiento en la nube
-          const form = new FormData();
-          form.append('audio', audioBlob, `recording.${ext}`);
-          form.append('mimeType', recorderMime);
-
-          const res = await fetch('/api/transcribe', {
-            method: 'POST',
-            body: form,
-          });
-
-          if (!res.ok) {
-            const data = await res.json();
-            throw new Error(data.error || 'Error al transcribir');
-          }
-
-          setState('done');
-          onDone();
-          setTimeout(() => {
-            setState('idle');
-            setDuration(0);
-          }, 2500);
-        } catch (err) {
-          setErrorMsg((err as Error).message || 'Error al procesar el audio');
-          setState('error');
-        }
-      };
-
-      recorder.start(1000);
-      recorderRef.current = recorder;
+      streamRef.current = stream;
+      isRecordingRef.current = true;
       setState('recording');
       setDuration(0);
       timerRef.current = setInterval(() => setDuration((d) => d + 1), 1000);
+      startChunkRef.current();
     } catch {
       setErrorMsg('No se pudo acceder al micrófono. Comprueba los permisos.');
       setState('error');
     }
-  }, [onDone]);
+  }, []);
 
   const stopRecording = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
-    recorderRef.current?.stop();
-    recorderRef.current?.stream.getTracks().forEach((t) => t.stop());
+    if (chunkTimerRef.current) clearTimeout(chunkTimerRef.current);
+    isRecordingRef.current = false;
+    setState('processing');
+    // Parar el recorder activo -> onstop -> finalizeTranscription
+    if (recorderRef.current?.state === 'recording') {
+      recorderRef.current.stop();
+    }
   }, []);
 
   const isDisabled = state === 'processing' || state === 'done';
@@ -150,7 +221,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
           </>
         )}
         {state === 'processing' && (
-          <p className="text-indigo-400 text-sm animate-pulse">Transcribiendo con IA…</p>
+          <p className="text-indigo-400 text-sm animate-pulse">Formateando transcripción…</p>
         )}
         {state === 'done' && (
           <p className="text-green-400 text-sm font-medium">Transcripción completada</p>
@@ -167,6 +238,14 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
           </div>
         )}
       </div>
+
+      {/* Preview en vivo mientras graba (aparece a partir del primer minuto) */}
+      {state === 'recording' && liveText && (
+        <div className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl p-4 max-h-36 overflow-y-auto">
+          <p className="text-xs text-gray-600 uppercase tracking-widest mb-2">Transcripción en vivo</p>
+          <p className="text-sm text-gray-300 leading-relaxed">{liveText}</p>
+        </div>
+      )}
     </div>
   );
 }
