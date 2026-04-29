@@ -1,6 +1,5 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
-import { del } from '@vercel/blob';
 import { getDb } from '@/lib/db';
 import { transcriptions } from '@/lib/schema';
 
@@ -8,23 +7,33 @@ export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-  const { blobUrl, mimeType } = await request.json();
 
-  if (!blobUrl) {
-    return NextResponse.json({ error: 'blobUrl requerido' }, { status: 400 });
+  let audioFile: File;
+  let mimeType: string;
+
+  const contentType = request.headers.get('content-type') ?? '';
+
+  if (contentType.includes('multipart/form-data')) {
+    // New path: audio sent directly as FormData (no Blob storage)
+    const form = await request.formData();
+    const audioEntry = form.get('audio');
+    mimeType = (form.get('mimeType') as string) || 'audio/webm';
+    if (!audioEntry || typeof audioEntry === 'string') {
+      return NextResponse.json({ error: 'Campo audio requerido' }, { status: 400 });
+    }
+    audioFile = audioEntry as File;
+  } else {
+    return NextResponse.json({ error: 'Content-Type debe ser multipart/form-data' }, { status: 415 });
   }
 
   try {
-    // 1. Fetch audio from Vercel Blob
-    const audioResponse = await fetch(blobUrl);
-    const audioBuffer = await audioResponse.arrayBuffer();
-    const cleanMime = (mimeType as string)?.split(';')[0] || 'audio/webm';
+    const cleanMime = mimeType.split(';')[0];
     const ext = cleanMime.includes('mp4') ? 'mp4' : cleanMime.includes('ogg') ? 'ogg' : 'webm';
-    const audioFile = new File([audioBuffer], `recording.${ext}`, { type: cleanMime });
+    const namedFile = new File([audioFile], `recording.${ext}`, { type: cleanMime });
 
-    // 2. Transcribe with Groq Whisper Large v3
+    // 1. Transcribe with Groq Whisper Large v3
     const transcription = await groq.audio.transcriptions.create({
-      file: audioFile,
+      file: namedFile,
       model: 'whisper-large-v3',
       response_format: 'verbose_json',
     });
@@ -36,11 +45,10 @@ export async function POST(request: Request) {
     const duration: number = Math.round((transcription as any).duration || 0);
 
     if (!rawText) {
-      await del(blobUrl).catch(() => {});
       return NextResponse.json({ error: 'No se detectó audio en la grabación' }, { status: 422 });
     }
 
-    // 3. Format with Llama 3.3 70B (fallback to raw text on failure)
+    // 2. Format with Llama 3.3 70B (fallback to raw text on failure)
     let formattedText = rawText;
     try {
       const completion = await groq.chat.completions.create({
@@ -61,19 +69,15 @@ export async function POST(request: Request) {
       // fallback to raw text
     }
 
-    // 4. Save to Neon DB
+    // 3. Save to Neon DB
     const db = getDb();
     const [saved] = await db
       .insert(transcriptions)
       .values({ language, durationSeconds: duration, rawText, formattedText })
       .returning();
 
-    // 5. Delete audio from Blob (cleanup)
-    await del(blobUrl).catch(() => {});
-
     return NextResponse.json({ id: saved.id, success: true });
   } catch (error) {
-    await del(blobUrl).catch(() => {});
     console.error('Transcribe error:', error);
     return NextResponse.json(
       { error: (error as Error).message || 'Error interno' },

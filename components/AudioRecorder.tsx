@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { upload } from '@vercel/blob/client';
 
 type RecorderState = 'idle' | 'recording' | 'processing' | 'done' | 'error';
 
@@ -43,7 +42,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
 
       const recorder = new MediaRecorder(stream, {
         mimeType,
-        audioBitsPerSecond: 32_000,
+        audioBitsPerSecond: 16_000, // 16kbps es suficiente para voz
       });
 
       chunksRef.current = [];
@@ -58,15 +57,14 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
           const ext = recorderMime.includes('mp4') ? 'mp4' : recorderMime.includes('ogg') ? 'ogg' : 'webm';
           const audioBlob = new Blob(chunksRef.current, { type: recorderMime });
 
-          const blob = await upload(`audio-${Date.now()}.${ext}`, audioBlob, {
-            access: 'public',
-            handleUploadUrl: '/api/upload',
-          });
+          // Envío directo como FormData — sin pasar por almacenamiento en la nube
+          const form = new FormData();
+          form.append('audio', audioBlob, `recording.${ext}`);
+          form.append('mimeType', recorderMime);
 
           const res = await fetch('/api/transcribe', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ blobUrl: blob.url, mimeType: recorderMime }),
+            body: form,
           });
 
           if (!res.ok) {

@@ -1,0 +1,5 @@
+{
+    "powerquery.client.additionalSymbolsDirectories": [
+        "d:/Proyectos/ITACA/transcriptor/plaude/.vscode/excel-pq-symbols"
+    ]
+}

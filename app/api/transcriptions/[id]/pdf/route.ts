@@ -1,9 +1,9 @@
 import { getDb } from '@/lib/db';
 import { transcriptions } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-import { renderToBuffer } from '@react-pdf/renderer';
-import { PdfDocument } from '@/lib/pdf';
-import React from 'react';
+import { buildPdf } from '@/lib/pdf';
+
+export const runtime = 'nodejs';
 
 export async function GET(
   _request: Request,
@@ -25,14 +25,10 @@ export async function GET(
     return new Response('Transcripción no encontrada', { status: 404 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const buffer = await renderToBuffer(
-    React.createElement(PdfDocument, { transcription }) as unknown as React.ReactElement<any, any>
-  );
-
+  const buffer = await buildPdf(transcription);
   const dateStr = new Date(transcription.createdAt).toISOString().split('T')[0];
 
-  return new Response(new Uint8Array(buffer), {
+  return new Response(buffer, {
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="transcripcion-${dateStr}.pdf"`,
