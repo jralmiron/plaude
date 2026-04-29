@@ -25,7 +25,8 @@ export async function GET(
     return new Response('Transcripción no encontrada', { status: 404 });
   }
 
-  const buffer = await buildPdf(transcription);
+  const pdfBytes = await buildPdf(transcription);
+  const buffer = Buffer.from(pdfBytes);
   const dateStr = new Date(transcription.createdAt).toISOString().split('T')[0];
 
   return new Response(buffer, {
