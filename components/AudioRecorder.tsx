@@ -3,11 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 type RecorderState = 'idle' | 'recording' | 'processing' | 'done' | 'error';
-type OutputLang = 'es' | 'en';
 
 const CHUNK_MS = 60_000;
-
-const LANG_LABELS: Record<OutputLang, string> = { es: 'Español', en: 'English' };
 
 function getSupportedMimeType(): string {
   const candidates = [
@@ -30,7 +27,6 @@ function formatTime(seconds: number): string {
 
 export function AudioRecorder({ onDone }: { onDone: () => void }) {
   const [state, setState] = useState<RecorderState>('idle');
-  const [outputLang, setOutputLang] = useState<OutputLang>('es');
   const [duration, setDuration] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
   const [liveText, setLiveText] = useState('');
@@ -213,7 +209,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
       const sRes = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ outputLanguage: outputLang }),
+        body: JSON.stringify({}),
       });
       if (!sRes.ok) throw new Error('No se pudo crear la sesión');
       const { id } = await sRes.json();
@@ -250,39 +246,6 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="flex flex-col items-center gap-6 py-2">
-
-      {/* Selector idioma de salida */}
-      {state === 'idle' && (
-        <div className="flex items-center gap-1 bg-gray-100 border border-gray-200 rounded-xl p-1">
-          {(Object.keys(LANG_LABELS) as OutputLang[]).map((lang) => (
-            <button
-              key={lang}
-              onClick={() => setOutputLang(lang)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                outputLang === lang
-                  ? 'bg-orange-500 text-white shadow'
-                  : 'text-gray-400 hover:text-gray-700'
-              }`}
-            >
-              {LANG_LABELS[lang]}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Idioma activo mientras graba */}
-      {state === 'recording' && (
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <span>Salida:</span>
-          <span className="text-orange-500 font-medium">{LANG_LABELS[outputLang]}</span>
-          {chunkCount > 0 && (
-            <>
-              <span>&middot;</span>
-              <span>{chunkCount} {chunkCount === 1 ? 'fragmento' : 'fragmentos'} guardados</span>
-            </>
-          )}
-        </div>
-      )}
 
       {/* Aviso de background en móvil */}
       {bgWarning && (
@@ -335,6 +298,9 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
             <p className="text-red-400 text-xs font-medium flex items-center gap-1.5 mb-1">
               <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse inline-block" />
               Grabando
+              {chunkCount > 0 && (
+                <span className="ml-1 text-gray-400">· {chunkCount} {chunkCount === 1 ? 'fragmento' : 'fragmentos'}</span>
+              )}
             </p>
             <p className="text-gray-900 text-3xl font-mono font-bold tabular-nums">
               {formatTime(duration)}

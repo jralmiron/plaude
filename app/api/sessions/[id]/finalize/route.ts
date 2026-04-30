@@ -41,33 +41,18 @@ export async function POST(
   const detectedLanguage =
     Object.entries(langCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'unknown';
 
-  // Obtener outputLanguage de la sesión
-  const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
-  const outputLanguage = session?.outputLanguage ?? 'es';
-
   // Duración total
   const totalDuration = chunks.reduce((acc, c) => acc + (c.durationSeconds ?? 0), 0);
 
   // Unir todo el texto crudo
   const rawText = chunks.map((c) => c.rawText).join(' ').trim();
 
-  // Normalizar idioma detectado a código corto para comparar
-  const langNames: Record<string, string> = { es: 'Spanish', en: 'English' };
-  const outputLangName = langNames[outputLanguage] ?? 'Spanish';
-  const langCodeMap: Record<string, string> = {
-    spanish: 'es', english: 'en', español: 'es', inglés: 'en',
-  };
-  const detectedCode =
-    langCodeMap[detectedLanguage.toLowerCase()] ??
-    detectedLanguage.slice(0, 2).toLowerCase();
-  const needsTranslation = detectedLanguage !== 'unknown' && detectedCode !== outputLanguage;
-
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
   let formattedText = rawText;
 
   try {
-    // Paso 1: formatear + diarizar en el idioma original
-    const step1 = await groq.chat.completions.create({
+    // Formatear + diarizar en el idioma detectado (sin traducción)
+    const result = await groq.chat.completions.create({
       model: 'llama-3.1-8b-instant',
       messages: [
         {
@@ -84,27 +69,7 @@ export async function POST(
       max_tokens: 8192,
       temperature: 0.1,
     });
-    formattedText = step1.choices[0]?.message?.content?.trim() || rawText;
-
-    // Paso 2: traducir en llamada separada (más fiable que pedir todo junto)
-    if (needsTranslation) {
-      const step2 = await groq.chat.completions.create({
-        model: 'llama-3.1-8b-instant',
-        messages: [
-          {
-            role: 'system',
-            content:
-              `Translate the following text to ${outputLangName}. ` +
-              'Preserve ALL paragraph breaks and speaker labels like [Persona 1]. ' +
-              'Return ONLY the translated text, nothing else.',
-          },
-          { role: 'user', content: formattedText },
-        ],
-        max_tokens: 8192,
-        temperature: 0.1,
-      });
-      formattedText = step2.choices[0]?.message?.content?.trim() || formattedText;
-    }
+    formattedText = result.choices[0]?.message?.content?.trim() || rawText;
   } catch {
     // fallback al texto crudo si falla LLaMA
   }
@@ -114,7 +79,7 @@ export async function POST(
     .insert(transcriptions)
     .values({
       language: detectedLanguage,
-      outputLanguage,
+      outputLanguage: detectedLanguage,
       durationSeconds: totalDuration,
       rawText,
       formattedText,

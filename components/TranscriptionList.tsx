@@ -14,8 +14,17 @@ interface TranscriptionItem {
 
 const LANG_LABELS: Record<string, string> = {
   spanish: 'Español', english: 'English',
-  es: 'Español', en: 'English',
+  es: 'Español', en: 'English', fr: 'Français', de: 'Deutsch', pt: 'Português', it: 'Italiano',
 };
+
+const TRANSLATE_OPTIONS = [
+  { code: 'es', label: 'Español' },
+  { code: 'en', label: 'English' },
+  { code: 'fr', label: 'Français' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'pt', label: 'Português' },
+  { code: 'it', label: 'Italiano' },
+];
 
 function langLabel(lang: string | null): string {
   if (!lang) return '--';
@@ -62,6 +71,8 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
   const [deleting, setDeleting] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [downloading, setDownloading] = useState<number | null>(null);
+  const [translating, setTranslating] = useState<number | null>(null);
+  const [translateOpen, setTranslateOpen] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -121,6 +132,29 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
     } finally {
       setDeleting(null);
       setConfirmDelete(null);
+    }
+  };
+
+  const translateItem = async (id: number, targetLang: string) => {
+    setTranslating(id);
+    setTranslateOpen(null);
+    try {
+      const res = await fetch(`/api/transcriptions/${id}/translate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetLang }),
+      });
+      if (!res.ok) throw new Error('Error al traducir');
+      const data: { formattedText: string; outputLanguage: string } = await res.json();
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === id ? { ...i, formattedText: data.formattedText, outputLanguage: data.outputLanguage } : i
+        )
+      );
+    } catch {
+      alert('No se pudo traducir.');
+    } finally {
+      setTranslating(null);
     }
   };
 
@@ -280,6 +314,37 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
                         </svg>
                         Editar
                       </button>
+
+                      {/* Traducir */}
+                      <div className="relative">
+                        <button
+                          onClick={() => setTranslateOpen(translateOpen === item.id ? null : item.id)}
+                          disabled={translating === item.id}
+                          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-400 transition-all disabled:opacity-40"
+                        >
+                          {translating === item.id ? (
+                            <div className="w-3 h-3 border border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                          ) : (
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                            </svg>
+                          )}
+                          {translating === item.id ? 'Traduciendo…' : 'Traducir'}
+                        </button>
+                        {translateOpen === item.id && (
+                          <div className="absolute left-0 top-full mt-1 z-10 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[130px]">
+                            {TRANSLATE_OPTIONS.map((opt) => (
+                              <button
+                                key={opt.code}
+                                onClick={() => translateItem(item.id, opt.code)}
+                                className="w-full text-left px-3 py-1.5 text-xs text-gray-600 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
 
                       {/* Borrar */}
                       {isConfirmingDelete ? (
