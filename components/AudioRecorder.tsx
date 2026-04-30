@@ -3,9 +3,11 @@
 import { useState, useRef, useCallback } from 'react';
 
 type RecorderState = 'idle' | 'recording' | 'processing' | 'done' | 'error';
+type OutputLang = 'es' | 'en';
 
-/** Corta la grabacion en chunks de 1 minuto para transcripcion en paralelo */
 const CHUNK_MS = 60_000;
+
+const LANG_LABELS: Record<OutputLang, string> = { es: 'Español', en: 'English' };
 
 function getSupportedMimeType(): string {
   const candidates = [
@@ -14,8 +16,8 @@ function getSupportedMimeType(): string {
     'audio/mp4',
     'audio/ogg;codecs=opus',
   ];
-  for (const type of candidates) {
-    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)) return type;
+  for (const t of candidates) {
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)) return t;
   }
   return 'audio/webm';
 }
@@ -28,58 +30,51 @@ function formatTime(seconds: number): string {
 
 export function AudioRecorder({ onDone }: { onDone: () => void }) {
   const [state, setState] = useState<RecorderState>('idle');
+  const [outputLang, setOutputLang] = useState<OutputLang>('es');
   const [duration, setDuration] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
   const [liveText, setLiveText] = useState('');
+  const [chunkCount, setChunkCount] = useState(0);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const isRecordingRef = useRef(false);
-  const contextRef = useRef('');        // ultimas 150 palabras -> prompt Whisper siguiente chunk
-  const rawChunksRef = useRef<string[]>([]);
-  const totalDurationRef = useRef(0);
-  const languageRef = useRef('unknown');
+  const contextRef = useRef('');
+  const sessionIdRef = useRef<number | null>(null);
+  const chunkIndexRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chunkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
 
-  // Ref para evitar dependencia circular entre startChunk y finalizeTranscription
   const startChunkRef = useRef<() => void>(() => {});
 
-  const finalizeTranscription = useCallback(async () => {
-    const fullText = rawChunksRef.current.join(' ').trim();
-    if (!fullText) {
-      setErrorMsg('No se detectó audio en la grabación');
+  const finalizeSession = useCallback(async () => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId) {
+      setErrorMsg('No hay sesión activa');
       setState('error');
       return;
     }
     try {
-      const res = await fetch('/api/transcriptions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rawText: fullText,
-          language: languageRef.current,
-          durationSeconds: totalDurationRef.current,
-        }),
-      });
+      const res = await fetch(`/api/sessions/${sessionId}/finalize`, { method: 'POST' });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        throw new Error(d.error || 'Error al guardar');
+        throw new Error(d.error || 'Error al finalizar');
       }
       setState('done');
       setLiveText('');
-      rawChunksRef.current = [];
+      setChunkCount(0);
+      chunkIndexRef.current = 0;
+      sessionIdRef.current = null;
       onDoneRef.current();
       setTimeout(() => { setState('idle'); setDuration(0); }, 2500);
     } catch (err) {
-      setErrorMsg((err as Error).message || 'Error al guardar');
+      setErrorMsg((err as Error).message || 'Error al finalizar');
       setState('error');
     }
   }, []);
 
-  // Definido como ref para llamarse recursivamente sin dependencias circulares
   startChunkRef.current = () => {
     if (!streamRef.current || !isRecordingRef.current) return;
 
@@ -95,6 +90,9 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
     };
 
     recorder.onstop = async () => {
+      const currentIndex = chunkIndexRef.current;
+      chunkIndexRef.current += 1;
+
       const audioBlob = new Blob(chunks, { type: recorder.mimeType });
       const cleanMime = recorder.mimeType.split(';')[0];
       const ext = cleanMime.includes('mp4') ? 'mp4' : cleanMime.includes('ogg') ? 'ogg' : 'webm';
@@ -105,36 +103,48 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
       if (contextRef.current) form.append('prompt', contextRef.current);
 
       try {
-        const res = await fetch('/api/transcribe', { method: 'POST', body: form });
-        if (res.ok) {
-          const data: { rawText: string; language: string; duration: number } = await res.json();
-          if (data.rawText) {
-            rawChunksRef.current.push(data.rawText);
-            totalDurationRef.current += data.duration ?? 0;
-            if (languageRef.current === 'unknown') languageRef.current = data.language ?? 'unknown';
-            const allText = rawChunksRef.current.join(' ');
-            // Mantener contexto: ultimas 150 palabras para el proximo chunk
-            contextRef.current = allText.split(' ').slice(-150).join(' ');
-            setLiveText(allText);
+        // 1. Transcribir con Whisper
+        const tRes = await fetch('/api/transcribe', { method: 'POST', body: form });
+        if (tRes.ok) {
+          const data: { rawText: string; language: string; duration: number } = await tRes.json();
+          if (data.rawText && sessionIdRef.current) {
+            // 2. Guardar chunk en BD
+            await fetch(`/api/sessions/${sessionIdRef.current}/chunks`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chunkIndex: currentIndex,
+                rawText: data.rawText,
+                language: data.language,
+                durationSeconds: data.duration,
+              }),
+            });
+
+            // Actualizar contexto y preview
+            const allChunks = contextRef.current
+              ? contextRef.current + ' ' + data.rawText
+              : data.rawText;
+            contextRef.current = allChunks.split(' ').slice(-150).join(' ');
+            setLiveText(allChunks);
+            setChunkCount((n) => n + 1);
           }
         }
       } catch {
-        // silencioso: el chunk se pierde pero la grabacion continua
+        // El chunk se pierde en memoria pero la sesion sigue en BD
       }
 
       if (isRecordingRef.current) {
-        startChunkRef.current(); // siguiente chunk inmediatamente
+        startChunkRef.current();
       } else {
         streamRef.current?.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
-        await finalizeTranscription();
+        await finalizeSession();
       }
     };
 
     recorderRef.current = recorder;
     recorder.start(500);
 
-    // Cortar automaticamente cada CHUNK_MS
     chunkTimerRef.current = setTimeout(() => {
       if (recorder.state === 'recording') recorder.stop();
     }, CHUNK_MS);
@@ -143,11 +153,20 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
   const startRecording = useCallback(async () => {
     setErrorMsg('');
     setLiveText('');
-    rawChunksRef.current = [];
-    totalDurationRef.current = 0;
-    languageRef.current = 'unknown';
+    chunkIndexRef.current = 0;
     contextRef.current = '';
+
     try {
+      // Crear sesión en BD
+      const sRes = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outputLanguage: outputLang }),
+      });
+      if (!sRes.ok) throw new Error('No se pudo crear la sesión');
+      const { id } = await sRes.json();
+      sessionIdRef.current = id;
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       isRecordingRef.current = true;
@@ -155,18 +174,17 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
       setDuration(0);
       timerRef.current = setInterval(() => setDuration((d) => d + 1), 1000);
       startChunkRef.current();
-    } catch {
-      setErrorMsg('No se pudo acceder al micrófono. Comprueba los permisos.');
+    } catch (err) {
+      setErrorMsg((err as Error).message || 'No se pudo acceder al micrófono');
       setState('error');
     }
-  }, []);
+  }, [outputLang]);
 
   const stopRecording = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (chunkTimerRef.current) clearTimeout(chunkTimerRef.current);
     isRecordingRef.current = false;
     setState('processing');
-    // Parar el recorder activo -> onstop -> finalizeTranscription
     if (recorderRef.current?.state === 'recording') {
       recorderRef.current.stop();
     }
@@ -176,6 +194,41 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="flex flex-col items-center gap-6 py-2">
+
+      {/* Selector idioma de salida */}
+      {state === 'idle' && (
+        <div className="flex items-center gap-1 bg-gray-800/60 border border-gray-700/50 rounded-xl p-1">
+          {(Object.keys(LANG_LABELS) as OutputLang[]).map((lang) => (
+            <button
+              key={lang}
+              onClick={() => setOutputLang(lang)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                outputLang === lang
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {LANG_LABELS[lang]}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Idioma activo mientras graba */}
+      {state === 'recording' && (
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <span>Salida:</span>
+          <span className="text-indigo-400 font-medium">{LANG_LABELS[outputLang]}</span>
+          {chunkCount > 0 && (
+            <>
+              <span>&middot;</span>
+              <span>{chunkCount} {chunkCount === 1 ? 'fragmento' : 'fragmentos'} guardados</span>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Botón principal */}
       <button
         onClick={state === 'recording' ? stopRecording : startRecording}
         disabled={isDisabled}
@@ -204,6 +257,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
         )}
       </button>
 
+      {/* Estado */}
       <div className="text-center min-h-[56px] flex flex-col items-center justify-center">
         {state === 'idle' && (
           <p className="text-gray-500 text-sm">Pulsa para grabar</p>
@@ -221,7 +275,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
           </>
         )}
         {state === 'processing' && (
-          <p className="text-indigo-400 text-sm animate-pulse">Formateando transcripción…</p>
+          <p className="text-indigo-400 text-sm animate-pulse">Procesando transcripción…</p>
         )}
         {state === 'done' && (
           <p className="text-green-400 text-sm font-medium">Transcripción completada</p>
@@ -239,9 +293,9 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
         )}
       </div>
 
-      {/* Preview en vivo mientras graba (aparece a partir del primer minuto) */}
+      {/* Preview en vivo (aparece a partir del primer chunk completado) */}
       {state === 'recording' && liveText && (
-        <div className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl p-4 max-h-36 overflow-y-auto">
+        <div className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl p-4 max-h-40 overflow-y-auto">
           <p className="text-xs text-gray-600 uppercase tracking-widest mb-2">Transcripción en vivo</p>
           <p className="text-sm text-gray-300 leading-relaxed">{liveText}</p>
         </div>
