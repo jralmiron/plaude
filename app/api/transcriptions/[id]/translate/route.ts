@@ -43,24 +43,50 @@ export async function POST(
 
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-  try {
-    const result = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
-      messages: [
-        {
-          role: 'system',
-          content:
-            `Translate the following text to ${LANG_NAMES[targetLang]}. ` +
-            'Preserve ALL paragraph breaks and speaker labels like [Persona 1]. ' +
-            'Return ONLY the translated text, nothing else.',
-        },
-        { role: 'user', content: item.formattedText },
-      ],
-      max_tokens: 8192,
-      temperature: 0.1,
-    });
+  // Dividir en trozos de ~800 palabras para no superar el límite de TPM de Groq (6000 tokens)
+  function splitIntoChunks(text: string, maxWords = 800): string[] {
+    const paragraphs = text.split(/\n+/);
+    const chunks: string[] = [];
+    let current: string[] = [];
+    let wordCount = 0;
 
-    const translatedText = result.choices[0]?.message?.content?.trim() || item.formattedText;
+    for (const para of paragraphs) {
+      const words = para.split(/\s+/).length;
+      if (wordCount + words > maxWords && current.length > 0) {
+        chunks.push(current.join('\n'));
+        current = [];
+        wordCount = 0;
+      }
+      current.push(para);
+      wordCount += words;
+    }
+    if (current.length > 0) chunks.push(current.join('\n'));
+    return chunks;
+  }
+
+  const systemPrompt =
+    `Translate the following text to ${LANG_NAMES[targetLang]}. ` +
+    'Preserve ALL paragraph breaks and speaker labels like [Persona 1]. ' +
+    'Return ONLY the translated text, nothing else.';
+
+  try {
+    const chunks = splitIntoChunks(item.formattedText);
+    const translatedChunks: string[] = [];
+
+    for (const chunk of chunks) {
+      const result = await groq.chat.completions.create({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: chunk },
+        ],
+        max_tokens: 2048,
+        temperature: 0.1,
+      });
+      translatedChunks.push(result.choices[0]?.message?.content?.trim() || chunk);
+    }
+
+    const translatedText = translatedChunks.join('\n\n');
 
     const [updated] = await db
       .update(transcriptions)
