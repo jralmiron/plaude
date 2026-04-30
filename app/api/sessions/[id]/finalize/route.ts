@@ -50,27 +50,62 @@ export async function POST(
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
   let formattedText = rawText;
 
+  // Divide texto en trozos de ~800 palabras para no superar el límite de TPM de Groq
+  function splitWords(text: string, maxWords = 800): string[] {
+    const sentences = text.match(/[^.!?]+[.!?]*/g) ?? [text];
+    const result: string[] = [];
+    let current = '';
+    let count = 0;
+    for (const sentence of sentences) {
+      const words = sentence.split(/\s+/).length;
+      if (count + words > maxWords && current) {
+        result.push(current.trim());
+        current = '';
+        count = 0;
+      }
+      current += sentence;
+      count += words;
+    }
+    if (current.trim()) result.push(current.trim());
+    return result.length > 0 ? result : [text];
+  }
+
+  const systemPrompt =
+    'You are a transcription editor. Format the following transcript:\n' +
+    '1. Add correct punctuation.\n' +
+    '2. Create paragraphs every 4-5 sentences or when the topic changes.\n' +
+    '3. Return ONLY the formatted text, no comments or explanations.';
+
   try {
-    // Formatear + diarizar en el idioma detectado (sin traducción)
-    const result = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are a transcription editor. Format the following transcript:\n' +
-            '1. Add correct punctuation.\n' +
-            '2. Create paragraphs every 4-5 sentences or when the topic changes.\n' +
-            '3. Return ONLY the formatted text, no comments or explanations.',
-        },
-        { role: 'user', content: rawText },
-      ],
-      max_tokens: 8192,
-      temperature: 0.1,
-    });
-    formattedText = result.choices[0]?.message?.content?.trim() || rawText;
+    const textChunks = splitWords(rawText);
+
+    // Procesar en lotes de 3 en paralelo para respetar rate limits de Groq
+    const formatted: string[] = new Array(textChunks.length);
+    const BATCH = 3;
+    for (let i = 0; i < textChunks.length; i += BATCH) {
+      const batch = textChunks.slice(i, i + BATCH);
+      const results = await Promise.all(
+        batch.map((chunk) =>
+          groq.chat.completions.create({
+            model: 'llama-3.1-8b-instant',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: chunk },
+            ],
+            max_tokens: 1024,
+            temperature: 0.1,
+          }).then((r) => r.choices[0]?.message?.content?.trim() ?? chunk)
+           .catch(() => chunk)
+        )
+      );
+      for (let j = 0; j < results.length; j++) {
+        formatted[i + j] = results[j];
+      }
+    }
+
+    formattedText = formatted.join('\n\n');
   } catch {
-    // fallback al texto crudo si falla LLaMA
+    // fallback al texto crudo si falla todo
   }
 
   // Guardar transcripción final
