@@ -228,7 +228,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
       setErrorMsg((err as Error).message || 'No se pudo acceder al micrófono');
       setState('error');
     }
-  }, [outputLang]);
+  }, [acquireWakeLock, startSilentAudio]);
 
   const stopRecording = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
