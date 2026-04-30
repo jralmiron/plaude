@@ -9,13 +9,13 @@ export default function Home() {
           <div className="absolute right-0 top-0">
             <Link
               href="/admin"
-              className="text-xs text-gray-400 hover:text-indigo-500 transition-colors"
+              className="text-xs text-gray-400 hover:text-orange-500 transition-colors"
             >
               Admin
             </Link>
           </div>
           <h1 className="text-5xl font-bold tracking-tight">
-            pla<span className="text-indigo-400">ude</span>
+            Her<span className="text-orange-500">mes</span>
           </h1>
           <p className="text-gray-500 text-sm mt-3 tracking-wide">
             Graba · Transcribe con IA · Descarga en PDF

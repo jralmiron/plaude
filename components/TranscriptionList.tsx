@@ -45,7 +45,7 @@ function renderFormattedText(text: string) {
   const parts = text.split(/(\[Persona \d+\])/g);
   return parts.map((part, i) =>
     /\[Persona \d+\]/.test(part) ? (
-      <span key={i} className="text-indigo-600 font-semibold text-xs">{part} </span>
+      <span key={i} className="text-orange-500 font-semibold text-xs">{part} </span>
     ) : (
       <span key={i}>{part}</span>
     )
@@ -220,13 +220,13 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
                         ref={textareaRef}
                         value={editText}
                         onChange={(e) => setEditText(e.target.value)}
-                        className="w-full bg-gray-50 border border-indigo-500/30 rounded-lg p-3 text-sm text-gray-800 leading-relaxed resize-none focus:outline-none focus:border-indigo-500/60 min-h-[120px]"
+                        className="w-full bg-gray-50 border border-orange-400/30 rounded-lg p-3 text-sm text-gray-800 leading-relaxed resize-none focus:outline-none focus:border-orange-400/60 min-h-[120px]"
                       />
                       <div className="flex gap-2">
                         <button
                           onClick={() => saveEdit(item.id)}
                           disabled={saving}
-                          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-50"
+                          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 text-white transition-all disabled:opacity-50"
                         >
                           {saving ? (
                             <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
@@ -258,10 +258,10 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
                       <button
                         onClick={() => downloadPdf(item.id, item.createdAt)}
                         disabled={downloading === item.id}
-                        className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/5 text-indigo-400 hover:bg-indigo-500/15 hover:border-indigo-500/40 transition-all disabled:opacity-40"
+                        className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-orange-400/20 bg-orange-500/5 text-orange-500 hover:bg-orange-500/15 hover:border-orange-400/40 transition-all disabled:opacity-40"
                       >
                         {downloading === item.id ? (
-                          <div className="w-3 h-3 border border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                          <div className="w-3 h-3 border border-orange-400/30 border-t-orange-400 rounded-full animate-spin" />
                         ) : (
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

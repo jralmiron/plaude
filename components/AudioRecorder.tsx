@@ -204,7 +204,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
               onClick={() => setOutputLang(lang)}
               className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
                 outputLang === lang
-                  ? 'bg-indigo-600 text-white shadow'
+                  ? 'bg-orange-500 text-white shadow'
                   : 'text-gray-400 hover:text-gray-700'
               }`}
             >
@@ -218,7 +218,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
       {state === 'recording' && (
         <div className="flex items-center gap-2 text-xs text-gray-500">
           <span>Salida:</span>
-          <span className="text-indigo-400 font-medium">{LANG_LABELS[outputLang]}</span>
+          <span className="text-orange-500 font-medium">{LANG_LABELS[outputLang]}</span>
           {chunkCount > 0 && (
             <>
               <span>&middot;</span>
@@ -237,7 +237,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
             ? 'bg-red-500 scale-110 shadow-red-500/40 ring-4 ring-red-500/20'
             : isDisabled
             ? 'bg-gray-200 cursor-not-allowed opacity-60'
-            : 'bg-indigo-600 hover:bg-indigo-500 hover:scale-105 active:scale-95 shadow-indigo-500/30 ring-4 ring-indigo-500/10 hover:ring-indigo-500/20'
+            : 'bg-orange-500 hover:bg-orange-400 hover:scale-105 active:scale-95 shadow-orange-500/30 ring-4 ring-orange-500/10 hover:ring-orange-500/20'
         }`}
         aria-label={state === 'recording' ? 'Detener grabación' : 'Iniciar grabación'}
       >
@@ -275,7 +275,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
           </>
         )}
         {state === 'processing' && (
-          <p className="text-indigo-400 text-sm animate-pulse">Procesando transcripción…</p>
+          <p className="text-orange-500 text-sm animate-pulse">Procesando transcripción…</p>
         )}
         {state === 'done' && (
           <p className="text-green-400 text-sm font-medium">Transcripción completada</p>

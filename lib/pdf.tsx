@@ -1,7 +1,7 @@
 ﻿import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import type { Transcription } from './schema';
 
-const INDIGO = rgb(0.31, 0.27, 0.9);
+const ORANGE = rgb(0.98, 0.45, 0.09);
 const GRAY_DARK = rgb(0.07, 0.07, 0.07);
 const GRAY_MID = rgb(0.61, 0.62, 0.63);
 const GRAY_LIGHT = rgb(0.89, 0.91, 0.92);
@@ -67,7 +67,7 @@ export async function buildPdf(transcription: Transcription): Promise<Uint8Array
 
   let { page, y } = addPage();
 
-  page.drawText('plaude', { x: marginX, y, font: helveticaBold, size: 28, color: INDIGO });
+  page.drawText('Hermes', { x: marginX, y, font: helveticaBold, size: 28, color: ORANGE });
   y -= 16;
   page.drawText('Transcripción de audio', { x: marginX, y, font: helvetica, size: 10, color: GRAY_MID });
   y -= 18;
@@ -110,7 +110,7 @@ export async function buildPdf(transcription: Transcription): Promise<Uint8Array
   for (const p of allPages) {
     const footerY = 32;
     p.drawLine({ start: { x: marginX, y: footerY + 12 }, end: { x: pageWidth - marginX, y: footerY + 12 }, thickness: 0.5, color: GRAY_LIGHT });
-    p.drawText('Generado con plaude', { x: marginX, y: footerY, font: helvetica, size: 8, color: GRAY_MID });
+    p.drawText('Generado con Hermes', { x: marginX, y: footerY, font: helvetica, size: 8, color: GRAY_MID });
     p.drawText(formatDate(transcription.createdAt), { x: pageWidth - marginX - 140, y: footerY, font: helvetica, size: 8, color: GRAY_MID });
   }
 

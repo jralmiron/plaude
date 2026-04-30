@@ -118,7 +118,7 @@ export default function AdminPage() {
         <div className="flex items-center justify-between mb-10">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              pla<span className="text-indigo-400">ude</span>{' '}
+              Her<span className="text-orange-500">mes</span>{' '}
               <span className="text-gray-400 font-normal text-xl">/ admin</span>
             </h1>
             <p className="text-gray-500 text-sm mt-1">Gestión de usuarios</p>
@@ -148,7 +148,7 @@ export default function AdminPage() {
                   onChange={(e) => setNewUsername(e.target.value)}
                   required
                   placeholder="nombre_usuario"
-                  className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-indigo-500/60 transition-all"
+                  className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-orange-400/60 transition-all"
                 />
               </div>
               <div>
@@ -159,7 +159,7 @@ export default function AdminPage() {
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
                   placeholder="••••••••"
-                  className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-indigo-500/60 transition-all"
+                  className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-orange-400/60 transition-all"
                 />
               </div>
             </div>
@@ -169,7 +169,7 @@ export default function AdminPage() {
                   <button
                     key={r} type="button" onClick={() => setNewRole(r)}
                     className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                      newRole === r ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-gray-700'
+                      newRole === r ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-gray-700'
                     }`}
                   >
                     {r === 'admin' ? 'Administrador' : 'Usuario'}
@@ -179,7 +179,7 @@ export default function AdminPage() {
               <button
                 type="submit"
                 disabled={creating}
-                className="ml-auto flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-50"
+                className="ml-auto flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-400 text-white transition-all disabled:opacity-50"
               >
                 {creating ? (
                   <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
@@ -225,7 +225,7 @@ export default function AdminPage() {
                           <input
                             value={editUsername}
                             onChange={(e) => setEditUsername(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-indigo-500/60 transition-all"
+                            className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-orange-400/60 transition-all"
                           />
                         </div>
                         <div>
@@ -235,7 +235,7 @@ export default function AdminPage() {
                             value={editPassword}
                             onChange={(e) => setEditPassword(e.target.value)}
                             placeholder="dejar vacío para no cambiar"
-                            className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-500/60 transition-all"
+                            className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-orange-400/60 transition-all"
                           />
                         </div>
                       </div>
@@ -245,7 +245,7 @@ export default function AdminPage() {
                             <button
                               key={r} type="button" onClick={() => setEditRole(r)}
                               className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                                editRole === r ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-gray-700'
+                                editRole === r ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-gray-700'
                               }`}
                             >
                               {r === 'admin' ? 'Administrador' : 'Usuario'}
@@ -256,7 +256,7 @@ export default function AdminPage() {
                           <button
                             onClick={() => saveEdit(u.id)}
                             disabled={saving}
-                            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-50"
+                            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 text-white transition-all disabled:opacity-50"
                           >
                             {saving ? <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" /> : null}
                             Guardar
@@ -272,8 +272,8 @@ export default function AdminPage() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-4 p-4">
-                      <div className="w-9 h-9 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
-                        <span className="text-indigo-400 text-sm font-bold uppercase">
+                      <div className="w-9 h-9 rounded-full bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
+                        <span className="text-orange-500 text-sm font-bold uppercase">
                           {u.username[0]}
                         </span>
                       </div>
@@ -282,7 +282,7 @@ export default function AdminPage() {
                           <span className="text-sm font-medium text-gray-900">{u.username}</span>
                           <span className={`text-xs px-2 py-0.5 rounded-full ${
                             u.role === 'admin'
-                              ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/20'
+                              ? 'bg-orange-500/15 text-orange-500 border border-orange-500/20'
                               : 'bg-gray-100 text-gray-500'
                           }`}>
                             {u.role === 'admin' ? 'Admin' : 'Usuario'}
