@@ -1,29 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-export const COOKIE_NAME = 'plaude_session';
-
-async function verifySession(token: string, secret: string): Promise<boolean> {
-  try {
-    const [payloadB64, sigB64] = token.split('.');
-    if (!payloadB64 || !sigB64) return false;
-
-    const payload = JSON.parse(atob(payloadB64));
-    if (!payload.exp || Date.now() > payload.exp) return false;
-
-    const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(secret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['verify']
-    );
-    const sigBytes = Uint8Array.from(atob(sigB64), (c) => c.charCodeAt(0));
-    return await crypto.subtle.verify('HMAC', key, sigBytes, encoder.encode(payloadB64));
-  } catch {
-    return false;
-  }
-}
+import { verifyToken, COOKIE_NAME } from '@/lib/auth';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -35,11 +11,19 @@ export async function middleware(request: NextRequest) {
 
   const secret = process.env.SESSION_SECRET ?? 'changeme-set-SESSION_SECRET-in-env';
   const token = request.cookies.get(COOKIE_NAME)?.value ?? '';
+  const payload = token ? await verifyToken(token, secret) : null;
 
-  if (!token || !(await verifySession(token, secret))) {
+  if (!payload) {
     const url = new URL('/login', request.url);
     url.searchParams.set('from', pathname);
     return NextResponse.redirect(url);
+  }
+
+  // Rutas de administración: solo rol admin
+  if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
+    if (payload.role !== 'admin') {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
   }
 
   return NextResponse.next();

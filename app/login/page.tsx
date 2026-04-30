@@ -103,6 +103,14 @@ function LoginForm() {
             )}
           </button>
         </form>
+        <p className="text-center mt-6">
+          <a
+            href="/admin"
+            className="text-xs text-gray-700 hover:text-indigo-400 transition-colors"
+          >
+            Panel de administración →
+          </a>
+        </p>
       </div>
     </main>
   );

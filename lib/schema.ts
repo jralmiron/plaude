@@ -36,3 +36,14 @@ export const audioChunks = pgTable('audio_chunks', {
 });
 
 export type AudioChunk = typeof audioChunks.$inferSelect;
+
+// Usuarios de la aplicación
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  username: varchar('username', { length: 100 }).notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  role: varchar('role', { length: 20 }).notNull().default('user'), // 'admin' | 'user'
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export type User = typeof users.$inferSelect;

@@ -127,5 +127,8 @@ export async function POST(
     .set({ status: 'done', transcriptionId: saved.id })
     .where(eq(sessions.id, sessionId));
 
+  // Limpiar chunks — ya están fusionados en la transcripción final
+  await db.delete(audioChunks).where(eq(audioChunks.sessionId, sessionId));
+
   return NextResponse.json({ transcriptionId: saved.id, success: true });
 }
