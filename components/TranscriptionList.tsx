@@ -214,7 +214,7 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
           return (
             <div
               key={item.id}
-              className="bg-white border border-gray-200 hover:border-gray-300 rounded-xl overflow-hidden transition-colors"
+              className="bg-white border border-gray-200 hover:border-gray-300 rounded-xl transition-colors"
             >
               {/* Cabecera */}
               <div
@@ -332,7 +332,7 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
                           {translating === item.id ? 'Traduciendo…' : 'Traducir'}
                         </button>
                         {translateOpen === item.id && (
-                          <div className="absolute left-0 top-full mt-1 z-10 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[130px]">
+                          <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[130px]">
                             {TRANSLATE_OPTIONS.map((opt) => (
                               <button
                                 key={opt.code}
