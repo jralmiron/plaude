@@ -51,41 +51,60 @@ export async function POST(
   // Unir todo el texto crudo
   const rawText = chunks.map((c) => c.rawText).join(' ').trim();
 
-  // Construir prompt para LLaMA: formateo + diarización + traducción si es necesario
+  // Normalizar idioma detectado a código corto para comparar
   const langNames: Record<string, string> = { es: 'Spanish', en: 'English' };
   const outputLangName = langNames[outputLanguage] ?? 'Spanish';
-  const needsTranslation =
-    detectedLanguage !== 'unknown' &&
-    !detectedLanguage.startsWith(outputLanguage) &&
-    detectedLanguage !== outputLangName.toLowerCase();
-
-  const systemPrompt = [
-    'You are a professional transcription editor. You will receive raw speech-to-text output and must return only the processed text.',
-    '',
-    'RULES:',
-    '1. Add correct punctuation (periods, commas, question marks, exclamation marks).',
-    '2. Create paragraphs every 4-5 sentences or when the topic changes.',
-    '3. Identify speaker changes and label them as [Persona 1], [Persona 2], etc. Each time you detect a new speaker, start a new paragraph with the label. If the conversation seems to be a single speaker, do NOT add speaker labels.',
-    needsTranslation
-      ? `4. Translate the entire text to ${outputLangName}. Preserve meaning exactly.`
-      : `4. Keep the text in ${outputLangName}. Do NOT translate.`,
-    '5. Return ONLY the processed text. No introductions, explanations or conclusions.',
-  ].join('\n');
+  const langCodeMap: Record<string, string> = {
+    spanish: 'es', english: 'en', español: 'es', inglés: 'en',
+  };
+  const detectedCode =
+    langCodeMap[detectedLanguage.toLowerCase()] ??
+    detectedLanguage.slice(0, 2).toLowerCase();
+  const needsTranslation = detectedLanguage !== 'unknown' && detectedCode !== outputLanguage;
 
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
   let formattedText = rawText;
 
   try {
-    const completion = await groq.chat.completions.create({
+    // Paso 1: formatear + diarizar en el idioma original
+    const step1 = await groq.chat.completions.create({
       model: 'llama-3.1-8b-instant',
       messages: [
-        { role: 'system', content: systemPrompt },
+        {
+          role: 'system',
+          content:
+            'You are a professional transcription editor. Rules:\n' +
+            '1. Add correct punctuation (periods, commas, question/exclamation marks).\n' +
+            '2. Create paragraphs every 4-5 sentences or when the topic changes.\n' +
+            '3. If multiple speakers are detected, label them [Persona 1], [Persona 2], etc. at each change. Single speaker = no labels.\n' +
+            '4. Return ONLY the processed text. No introductions or comments.',
+        },
         { role: 'user', content: rawText },
       ],
       max_tokens: 8192,
       temperature: 0.1,
     });
-    formattedText = completion.choices[0]?.message?.content?.trim() || rawText;
+    formattedText = step1.choices[0]?.message?.content?.trim() || rawText;
+
+    // Paso 2: traducir en llamada separada (más fiable que pedir todo junto)
+    if (needsTranslation) {
+      const step2 = await groq.chat.completions.create({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          {
+            role: 'system',
+            content:
+              `Translate the following text to ${outputLangName}. ` +
+              'Preserve ALL paragraph breaks and speaker labels like [Persona 1]. ' +
+              'Return ONLY the translated text, nothing else.',
+          },
+          { role: 'user', content: formattedText },
+        ],
+        max_tokens: 8192,
+        temperature: 0.1,
+      });
+      formattedText = step2.choices[0]?.message?.content?.trim() || formattedText;
+    }
   } catch {
     // fallback al texto crudo si falla LLaMA
   }
