@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
 
+export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
@@ -41,10 +42,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ rawText, language, duration });
   } catch (error) {
-    console.error('Transcribe error:', error);
+    const err = error as Error & { status?: number; statusCode?: number };
+    console.error('Transcribe error:', err?.message, err?.status ?? err?.statusCode);
+    const status = err?.status ?? err?.statusCode ?? 500;
+    // Devolver 429 al cliente si Groq devuelve rate limit, para que el frontend pueda reintentarlo
+    const clientStatus = status === 429 ? 429 : 500;
     return NextResponse.json(
-      { error: (error as Error).message || 'Error interno' },
-      { status: 500 }
+      { error: err?.message || 'Error interno', groqStatus: status },
+      { status: clientStatus }
     );
   }
 }

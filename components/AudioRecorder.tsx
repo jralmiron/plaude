@@ -147,40 +147,49 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
       const cleanMime = recorder.mimeType.split(';')[0];
       const ext = cleanMime.includes('mp4') ? 'mp4' : cleanMime.includes('ogg') ? 'ogg' : 'webm';
 
-      const form = new FormData();
-      form.append('audio', audioBlob, `chunk.${ext}`);
-      form.append('mimeType', recorder.mimeType);
-      if (contextRef.current) form.append('prompt', contextRef.current);
+      const buildForm = () => {
+        const form = new FormData();
+        form.append('audio', audioBlob, `chunk.${ext}`);
+        form.append('mimeType', recorder.mimeType);
+        if (contextRef.current) form.append('prompt', contextRef.current);
+        return form;
+      };
+
+      // Intento con un reintento automático si Groq devuelve 429 (rate limit)
+      const tryTranscribe = async (attempt = 0): Promise<{ rawText: string; language: string; duration: number } | null> => {
+        const tRes = await fetch('/api/transcribe', { method: 'POST', body: buildForm() });
+        if (tRes.ok) return tRes.json();
+        if (tRes.status === 429 && attempt === 0) {
+          await new Promise((r) => setTimeout(r, 2500));
+          return tryTranscribe(1);
+        }
+        return null;
+      };
 
       try {
         // 1. Transcribir con Whisper
-        const tRes = await fetch('/api/transcribe', { method: 'POST', body: form });
-        if (tRes.ok) {
-          const data: { rawText: string; language: string; duration: number } = await tRes.json();
-          if (data.rawText && sessionIdRef.current) {
-            // 2. Guardar chunk en BD
-            const saveRes = await fetch(`/api/sessions/${sessionIdRef.current}/chunks`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chunkIndex: currentIndex,
-                rawText: data.rawText,
-                language: data.language,
-                durationSeconds: data.duration,
-              }),
-            });
+        const data = await tryTranscribe();
+        if (data && data.rawText && sessionIdRef.current) {
+          // 2. Guardar chunk en BD
+          const saveRes = await fetch(`/api/sessions/${sessionIdRef.current}/chunks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chunkIndex: currentIndex,
+              rawText: data.rawText,
+              language: data.language,
+              durationSeconds: data.duration,
+            }),
+          });
 
-            if (saveRes.ok) {
-              // Actualizar contexto y preview
-              const allChunks = contextRef.current
-                ? contextRef.current + ' ' + data.rawText
-                : data.rawText;
-              contextRef.current = allChunks.split(' ').slice(-150).join(' ');
-              setLiveText(allChunks);
-              setChunkCount((n) => n + 1);
-            } else {
-              setFailedChunks((n) => n + 1);
-            }
+          if (saveRes.ok) {
+            // Actualizar contexto y preview
+            const allChunks = contextRef.current
+              ? contextRef.current + ' ' + data.rawText
+              : data.rawText;
+            contextRef.current = allChunks.split(' ').slice(-150).join(' ');
+            setLiveText(allChunks);
+            setChunkCount((n) => n + 1);
           } else {
             setFailedChunks((n) => n + 1);
           }
