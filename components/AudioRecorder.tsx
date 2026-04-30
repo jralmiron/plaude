@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 type RecorderState = 'idle' | 'recording' | 'processing' | 'done' | 'error';
 type OutputLang = 'es' | 'en';
@@ -47,7 +47,59 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
 
+  // Wake Lock + silent audio para mantener grabación activa en móvil
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const wakeLockRef = useRef<any>(null);
+  const silentCtxRef = useRef<AudioContext | null>(null);
+  const [bgWarning, setBgWarning] = useState(false);
+
   const startChunkRef = useRef<() => void>(() => {});
+
+  const acquireWakeLock = useCallback(async () => {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+      }
+    } catch { /* no soportado o denegado */ }
+  }, []);
+
+  const releaseWakeLock = useCallback(() => {
+    wakeLockRef.current?.release().catch(() => {});
+    wakeLockRef.current = null;
+  }, []);
+
+  // Reproduce audio silencioso en loop para que Android no suspenda el pipeline de audio
+  const startSilentAudio = useCallback(() => {
+    try {
+      const ctx = new AudioContext();
+      const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      src.connect(ctx.destination);
+      src.start(0);
+      silentCtxRef.current = ctx;
+    } catch { /* ignorado */ }
+  }, []);
+
+  const stopSilentAudio = useCallback(() => {
+    silentCtxRef.current?.close().catch(() => {});
+    silentCtxRef.current = null;
+  }, []);
+
+  // Avisa cuando la página queda en background; reintenta wake lock al volver
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden' && isRecordingRef.current) {
+        setBgWarning(true);
+      } else {
+        setBgWarning(false);
+        if (isRecordingRef.current) acquireWakeLock();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [acquireWakeLock]);
 
   const finalizeSession = useCallback(async () => {
     const sessionId = sessionIdRef.current;
@@ -173,6 +225,8 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
       setState('recording');
       setDuration(0);
       timerRef.current = setInterval(() => setDuration((d) => d + 1), 1000);
+      await acquireWakeLock();
+      startSilentAudio();
       startChunkRef.current();
     } catch (err) {
       setErrorMsg((err as Error).message || 'No se pudo acceder al micrófono');
@@ -184,11 +238,13 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
     if (timerRef.current) clearInterval(timerRef.current);
     if (chunkTimerRef.current) clearTimeout(chunkTimerRef.current);
     isRecordingRef.current = false;
+    releaseWakeLock();
+    stopSilentAudio();
     setState('processing');
     if (recorderRef.current?.state === 'recording') {
       recorderRef.current.stop();
     }
-  }, []);
+  }, [releaseWakeLock, stopSilentAudio]);
 
   const isDisabled = state === 'processing' || state === 'done';
 
@@ -225,6 +281,18 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
               <span>{chunkCount} {chunkCount === 1 ? 'fragmento' : 'fragmentos'} guardados</span>
             </>
           )}
+        </div>
+      )}
+
+      {/* Aviso de background en móvil */}
+      {bgWarning && (
+        <div className="w-full bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-start gap-2">
+          <svg className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <p className="text-xs text-amber-700 leading-snug">
+            La grabación puede pausarse mientras la pantalla está apagada o en otra app. Mantén la pantalla activa para mayor fiabilidad.
+          </p>
         </div>
       )}
 
