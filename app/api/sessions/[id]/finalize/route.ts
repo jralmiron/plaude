@@ -58,11 +58,10 @@ export async function POST(
         {
           role: 'system',
           content:
-'You are a professional transcription editor and speaker diarization expert. Follow these rules strictly:\n' +
-            '1. Add correct punctuation (periods, commas, question marks, exclamation marks).\n' +
-            '2. Create a new paragraph for each speaker turn or every 4-5 sentences.\n' +
-            '3. SPEAKER DETECTION (critical): Conversations between two or more people are very common. Look for these patterns that indicate a speaker change: direct questions followed by answers, greetings/farewells, topic shifts, different vocabulary/register, or any natural dialogue exchange. When in doubt, assume there ARE multiple speakers and label them. Label each speaker turn as [Persona 1], [Persona 2], etc. at the start of their paragraph. Only omit labels if the entire text is clearly a single person monologue (e.g. a lecture, a voice memo to oneself).\n' +
-            '4. Return ONLY the formatted text. No comments, no introductions, no explanations.',
+            'You are a transcription editor. Do exactly this:\n' +
+            '1. Add correct punctuation.\n' +
+            '2. Identify each speaker turn and label it [Persona 1], [Persona 2], etc. Each time the speaker changes, start a new line with the label. If it is clearly a single-person monologue with no dialogue, omit labels.\n' +
+            '3. Return ONLY the formatted text, nothing else.',
         },
         { role: 'user', content: rawText },
       ],
