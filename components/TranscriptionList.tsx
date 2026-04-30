@@ -144,15 +144,18 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetLang }),
       });
-      if (!res.ok) throw new Error('Error al traducir');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${res.status}`);
+      }
       const data: { formattedText: string; outputLanguage: string } = await res.json();
       setItems((prev) =>
         prev.map((i) =>
           i.id === id ? { ...i, formattedText: data.formattedText, outputLanguage: data.outputLanguage } : i
         )
       );
-    } catch {
-      alert('No se pudo traducir.');
+    } catch (err) {
+      alert(`No se pudo traducir: ${(err as Error).message}`);
     } finally {
       setTranslating(null);
     }

@@ -4,6 +4,7 @@ import Groq from 'groq-sdk';
 import { getDb } from '@/lib/db';
 import { transcriptions } from '@/lib/schema';
 
+export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const LANG_NAMES: Record<string, string> = {
