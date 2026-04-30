@@ -39,18 +39,18 @@ function LoginForm() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
+      <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
           <h1 className="text-4xl font-bold tracking-tight">
             pla<span className="text-indigo-400">ude</span>
           </h1>
-          <p className="text-gray-600 text-sm mt-2">Accede para continuar</p>
+          <p className="text-gray-500 text-sm mt-2">Accede para continuar</p>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="bg-gray-900 border border-gray-800 rounded-2xl p-8 space-y-5"
+          className="bg-white border border-gray-200 shadow-sm rounded-2xl p-8 space-y-5"
         >
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-gray-500 uppercase tracking-widest">
@@ -62,7 +62,7 @@ function LoginForm() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-              className="w-full bg-gray-800/60 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/30 transition-all"
               placeholder="usuario"
             />
           </div>
@@ -77,7 +77,7 @@ function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full bg-gray-800/60 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/30 transition-all"
               placeholder="••••••••"
             />
           </div>
@@ -106,7 +106,7 @@ function LoginForm() {
         <p className="text-center mt-6">
           <a
             href="/admin"
-            className="text-xs text-gray-700 hover:text-indigo-400 transition-colors"
+            className="text-xs text-gray-400 hover:text-indigo-500 transition-colors"
           >
             Panel de administración →
           </a>

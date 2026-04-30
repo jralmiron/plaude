@@ -197,7 +197,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
 
       {/* Selector idioma de salida */}
       {state === 'idle' && (
-        <div className="flex items-center gap-1 bg-gray-800/60 border border-gray-700/50 rounded-xl p-1">
+        <div className="flex items-center gap-1 bg-gray-100 border border-gray-200 rounded-xl p-1">
           {(Object.keys(LANG_LABELS) as OutputLang[]).map((lang) => (
             <button
               key={lang}
@@ -205,7 +205,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
               className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
                 outputLang === lang
                   ? 'bg-indigo-600 text-white shadow'
-                  : 'text-gray-500 hover:text-gray-300'
+                  : 'text-gray-400 hover:text-gray-700'
               }`}
             >
               {LANG_LABELS[lang]}
@@ -236,7 +236,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
           state === 'recording'
             ? 'bg-red-500 scale-110 shadow-red-500/40 ring-4 ring-red-500/20'
             : isDisabled
-            ? 'bg-gray-700 cursor-not-allowed opacity-60'
+            ? 'bg-gray-200 cursor-not-allowed opacity-60'
             : 'bg-indigo-600 hover:bg-indigo-500 hover:scale-105 active:scale-95 shadow-indigo-500/30 ring-4 ring-indigo-500/10 hover:ring-indigo-500/20'
         }`}
         aria-label={state === 'recording' ? 'Detener grabación' : 'Iniciar grabación'}
@@ -268,10 +268,10 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
               <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse inline-block" />
               Grabando
             </p>
-            <p className="text-white text-3xl font-mono font-bold tabular-nums">
+            <p className="text-gray-900 text-3xl font-mono font-bold tabular-nums">
               {formatTime(duration)}
             </p>
-            <p className="text-gray-600 text-xs mt-1">Pulsa para detener</p>
+            <p className="text-gray-400 text-xs mt-1">Pulsa para detener</p>
           </>
         )}
         {state === 'processing' && (
@@ -285,7 +285,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
             <p className="text-red-400 text-sm max-w-xs">{errorMsg}</p>
             <button
               onClick={() => setState('idle')}
-              className="text-xs text-gray-600 hover:text-gray-300 mt-2 underline underline-offset-2"
+              className="text-xs text-gray-400 hover:text-gray-600 mt-2 underline underline-offset-2"
             >
               Reintentar
             </button>
@@ -295,9 +295,9 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
 
       {/* Preview en vivo (aparece a partir del primer chunk completado) */}
       {state === 'recording' && liveText && (
-        <div className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl p-4 max-h-40 overflow-y-auto">
-          <p className="text-xs text-gray-600 uppercase tracking-widest mb-2">Transcripción en vivo</p>
-          <p className="text-sm text-gray-300 leading-relaxed">{liveText}</p>
+        <div className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 max-h-40 overflow-y-auto">
+          <p className="text-xs text-gray-400 uppercase tracking-widest mb-2">Transcripción en vivo</p>
+          <p className="text-sm text-gray-700 leading-relaxed">{liveText}</p>
         </div>
       )}
     </div>

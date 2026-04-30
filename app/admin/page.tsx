@@ -112,20 +112,20 @@ export default function AdminPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-950">
+    <main className="min-h-screen bg-gray-50">
       <div className="max-w-2xl mx-auto px-4 py-16">
         {/* Cabecera */}
         <div className="flex items-center justify-between mb-10">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
               pla<span className="text-indigo-400">ude</span>{' '}
-              <span className="text-gray-600 font-normal text-xl">/ admin</span>
+              <span className="text-gray-400 font-normal text-xl">/ admin</span>
             </h1>
-            <p className="text-gray-600 text-sm mt-1">Gestión de usuarios</p>
+            <p className="text-gray-500 text-sm mt-1">Gestión de usuarios</p>
           </div>
           <a
             href="/"
-            className="text-xs text-gray-600 hover:text-gray-300 transition-colors flex items-center gap-1.5"
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1.5"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -135,41 +135,41 @@ export default function AdminPage() {
         </div>
 
         {/* Formulario nuevo usuario */}
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-8">
-          <h2 className="text-sm font-medium text-gray-400 uppercase tracking-widest mb-4">
+        <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6 mb-8">
+          <h2 className="text-sm font-medium text-gray-500 uppercase tracking-widest mb-4">
             Nuevo usuario
           </h2>
           <form onSubmit={createUser} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-600 mb-1 block">Usuario</label>
+                <label className="text-xs text-gray-500 mb-1 block">Usuario</label>
                 <input
                   value={newUsername}
                   onChange={(e) => setNewUsername(e.target.value)}
                   required
                   placeholder="nombre_usuario"
-                  className="w-full bg-gray-800/60 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500/60 transition-all"
+                  className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-indigo-500/60 transition-all"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-600 mb-1 block">Contraseña</label>
+                <label className="text-xs text-gray-500 mb-1 block">Contraseña</label>
                 <input
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
                   placeholder="••••••••"
-                  className="w-full bg-gray-800/60 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500/60 transition-all"
+                  className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-indigo-500/60 transition-all"
                 />
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1 bg-gray-800/60 border border-gray-700/50 rounded-xl p-1">
+              <div className="flex items-center gap-1 bg-gray-100 border border-gray-200 rounded-xl p-1">
                 {(['user', 'admin'] as const).map((r) => (
                   <button
                     key={r} type="button" onClick={() => setNewRole(r)}
                     className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                      newRole === r ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-300'
+                      newRole === r ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-gray-700'
                     }`}
                   >
                     {r === 'admin' ? 'Administrador' : 'Usuario'}
@@ -201,13 +201,13 @@ export default function AdminPage() {
 
         {/* Lista de usuarios */}
         <div>
-          <p className="text-xs font-medium text-gray-600 uppercase tracking-widest mb-4">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-4">
             Usuarios · {users.length}
           </p>
           {loading ? (
             <div className="space-y-3">
               {[1, 2].map((i) => (
-                <div key={i} className="h-16 bg-gray-800/40 rounded-xl animate-pulse" />
+                <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />
               ))}
             </div>
           ) : (
@@ -215,37 +215,37 @@ export default function AdminPage() {
               {users.map((u) => (
                 <div
                   key={u.id}
-                  className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden"
+                  className="bg-white border border-gray-200 shadow-sm rounded-xl overflow-hidden"
                 >
                   {editing === u.id ? (
                     <div className="p-4 space-y-3">
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-xs text-gray-600 mb-1 block">Usuario</label>
+                          <label className="text-xs text-gray-500 mb-1 block">Usuario</label>
                           <input
                             value={editUsername}
                             onChange={(e) => setEditUsername(e.target.value)}
-                            className="w-full bg-gray-800/60 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/60 transition-all"
+                            className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-indigo-500/60 transition-all"
                           />
                         </div>
                         <div>
-                          <label className="text-xs text-gray-600 mb-1 block">Nueva contraseña (opcional)</label>
+                          <label className="text-xs text-gray-500 mb-1 block">Nueva contraseña (opcional)</label>
                           <input
                             type="password"
                             value={editPassword}
                             onChange={(e) => setEditPassword(e.target.value)}
                             placeholder="dejar vacío para no cambiar"
-                            className="w-full bg-gray-800/60 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-indigo-500/60 transition-all"
+                            className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-500/60 transition-all"
                           />
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1 bg-gray-800/60 border border-gray-700/50 rounded-xl p-1">
+                        <div className="flex items-center gap-1 bg-gray-100 border border-gray-200 rounded-xl p-1">
                           {(['user', 'admin'] as const).map((r) => (
                             <button
                               key={r} type="button" onClick={() => setEditRole(r)}
                               className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                                editRole === r ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-300'
+                                editRole === r ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-gray-700'
                               }`}
                             >
                               {r === 'admin' ? 'Administrador' : 'Usuario'}
@@ -263,7 +263,7 @@ export default function AdminPage() {
                           </button>
                           <button
                             onClick={() => setEditing(null)}
-                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:text-gray-200 transition-all"
+                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-400 transition-all"
                           >
                             Cancelar
                           </button>
@@ -279,21 +279,21 @@ export default function AdminPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-white">{u.username}</span>
+                          <span className="text-sm font-medium text-gray-900">{u.username}</span>
                           <span className={`text-xs px-2 py-0.5 rounded-full ${
                             u.role === 'admin'
                               ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/20'
-                              : 'bg-gray-800 text-gray-500'
+                              : 'bg-gray-100 text-gray-500'
                           }`}>
                             {u.role === 'admin' ? 'Admin' : 'Usuario'}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-600 mt-0.5">{fmtDate(u.createdAt)}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{fmtDate(u.createdAt)}</p>
                       </div>
                       <div className="flex gap-2 shrink-0">
                         <button
                           onClick={() => startEdit(u)}
-                          className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:text-gray-200 hover:border-gray-600 transition-all"
+                          className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-400 transition-all"
                         >
                           Editar
                         </button>
@@ -309,7 +309,7 @@ export default function AdminPage() {
                             </button>
                             <button
                               onClick={() => setConfirmDelete(null)}
-                              className="text-xs text-gray-600 hover:text-gray-400 transition-all"
+                              className="text-xs text-gray-400 hover:text-gray-600 transition-all"
                             >
                               No
                             </button>
@@ -317,7 +317,7 @@ export default function AdminPage() {
                         ) : (
                           <button
                             onClick={() => setConfirmDelete(u.id)}
-                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-700 text-gray-600 hover:text-red-400 hover:border-red-500/30 transition-all"
+                            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-400/40 transition-all"
                           >
                             Borrar
                           </button>

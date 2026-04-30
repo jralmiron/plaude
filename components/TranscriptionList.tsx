@@ -45,7 +45,7 @@ function renderFormattedText(text: string) {
   const parts = text.split(/(\[Persona \d+\])/g);
   return parts.map((part, i) =>
     /\[Persona \d+\]/.test(part) ? (
-      <span key={i} className="text-indigo-400 font-semibold text-xs">{part} </span>
+      <span key={i} className="text-indigo-600 font-semibold text-xs">{part} </span>
     ) : (
       <span key={i}>{part}</span>
     )
@@ -147,7 +147,7 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
     return (
       <div className="space-y-3 mt-8">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-24 bg-gray-800/40 rounded-xl animate-pulse" />
+          <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />
         ))}
       </div>
     );
@@ -156,19 +156,19 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
   if (items.length === 0) {
     return (
       <div className="text-center py-20">
-        <svg className="w-10 h-10 mx-auto mb-3 text-gray-700" viewBox="0 0 24 24" fill="currentColor">
+        <svg className="w-10 h-10 mx-auto mb-3 text-gray-300" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
           <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
         </svg>
-        <p className="text-gray-600 text-sm">Sin grabaciones todavía</p>
-        <p className="text-gray-700 text-xs mt-1">Pulsa el botón para empezar</p>
+        <p className="text-gray-500 text-sm">Sin grabaciones todavía</p>
+        <p className="text-gray-400 text-xs mt-1">Pulsa el botón para empezar</p>
       </div>
     );
   }
 
   return (
     <div className="mt-8">
-      <p className="text-xs font-medium text-gray-600 uppercase tracking-widest mb-4">
+      <p className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-4">
         Historial &middot; {items.length} {items.length === 1 ? 'grabación' : 'grabaciones'}
       </p>
       <div className="space-y-3">
@@ -180,7 +180,7 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
           return (
             <div
               key={item.id}
-              className="bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-xl overflow-hidden transition-colors"
+              className="bg-white border border-gray-200 hover:border-gray-300 rounded-xl overflow-hidden transition-colors"
             >
               {/* Cabecera */}
               <div
@@ -191,20 +191,20 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
                   <div className="flex flex-wrap items-center gap-2 mb-2">
                     <span className="text-xs text-gray-500">{fmtDate(item.createdAt)}</span>
                     {item.language && (
-                      <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full">
+                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
                         {langLabel(item.language)} → {langLabel(item.outputLanguage)}
                       </span>
                     )}
-                    <span className="text-xs text-gray-600 font-mono">
+                    <span className="text-xs text-gray-400 font-mono">
                       {fmtDuration(item.durationSeconds)}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-400 leading-relaxed">
+                  <p className="text-sm text-gray-600 leading-relaxed">
                     {truncate(item.formattedText)}
                   </p>
                 </div>
                 <svg
-                  className={`shrink-0 w-4 h-4 text-gray-600 transition-transform mt-1 ${isExpanded ? 'rotate-180' : ''}`}
+                  className={`shrink-0 w-4 h-4 text-gray-400 transition-transform mt-1 ${isExpanded ? 'rotate-180' : ''}`}
                   fill="none" viewBox="0 0 24 24" stroke="currentColor"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -213,14 +213,14 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
 
               {/* Detalle expandido */}
               {isExpanded && (
-                <div className="border-t border-gray-800 px-5 pb-5 pt-4">
+                <div className="border-t border-gray-200 px-5 pb-5 pt-4">
                   {isEditing ? (
                     <div className="space-y-3">
                       <textarea
                         ref={textareaRef}
                         value={editText}
                         onChange={(e) => setEditText(e.target.value)}
-                        className="w-full bg-gray-800/60 border border-indigo-500/30 rounded-lg p-3 text-sm text-gray-200 leading-relaxed resize-none focus:outline-none focus:border-indigo-500/60 min-h-[120px]"
+                        className="w-full bg-gray-50 border border-indigo-500/30 rounded-lg p-3 text-sm text-gray-800 leading-relaxed resize-none focus:outline-none focus:border-indigo-500/60 min-h-[120px]"
                       />
                       <div className="flex gap-2">
                         <button
@@ -239,21 +239,21 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
                         </button>
                         <button
                           onClick={cancelEdit}
-                          className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:text-gray-200 hover:border-gray-600 transition-all"
+                          className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-400 transition-all"
                         >
                           Cancelar
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
+                    <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
                       {renderFormattedText(item.formattedText)}
                     </div>
                   )}
 
                   {/* Acciones */}
                   {!isEditing && (
-                    <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-800">
+                    <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-200">
                       {/* PDF */}
                       <button
                         onClick={() => downloadPdf(item.id, item.createdAt)}
@@ -273,7 +273,7 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
                       {/* Editar */}
                       <button
                         onClick={() => startEdit(item)}
-                        className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:text-gray-200 hover:border-gray-600 transition-all"
+                        className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-400 transition-all"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -302,7 +302,7 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
                       ) : (
                         <button
                           onClick={() => setConfirmDelete(item.id)}
-                          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-700 text-gray-600 hover:text-red-400 hover:border-red-500/30 transition-all"
+                          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-400/40 transition-all"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
