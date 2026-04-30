@@ -58,10 +58,13 @@ export async function POST(
         {
           role: 'system',
           content:
-            'You are a transcription editor. Do exactly this:\n' +
+            'You are a transcription editor. The text may contain [PAUSA] markers that indicate a silence of more than 1 second — these are the primary signal for a speaker change.\n' +
+            'Rules:\n' +
             '1. Add correct punctuation.\n' +
-            '2. Identify each speaker turn and label it [Persona 1], [Persona 2], etc. Each time the speaker changes, start a new line with the label. If it is clearly a single-person monologue with no dialogue, omit labels.\n' +
-            '3. Return ONLY the formatted text, nothing else.',
+            '2. Every [PAUSA] marker is very likely a speaker change. Replace it with a new line and the next speaker label.\n' +
+            '3. Label each speaker turn as [Persona 1], [Persona 2], etc. Alternate speakers at each [PAUSA] unless context clearly shows it is the same person continuing.\n' +
+            '4. If there are no [PAUSA] markers and the text is clearly one person talking, omit labels.\n' +
+            '5. Return ONLY the formatted text, no comments or explanations.',
         },
         { role: 'user', content: rawText },
       ],

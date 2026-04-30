@@ -39,7 +39,24 @@ export async function POST(request: Request) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const duration: number = Math.round((transcription as any).duration || 0);
 
-    return NextResponse.json({ rawText, language, duration });
+    // Construir texto anotado con marcadores de pausa (>1s entre segmentos)
+    // Estos marcadores ayudan a LLaMA a detectar cambios de hablante
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const segments: Array<{ start: number; end: number; text: string }> = (transcription as any).segments || [];
+    let annotatedText = rawText;
+    if (segments.length > 1) {
+      let built = '';
+      for (let i = 0; i < segments.length; i++) {
+        if (i > 0) {
+          const pause = segments[i].start - segments[i - 1].end;
+          if (pause > 1.0) built += ' [PAUSA] ';
+        }
+        built += segments[i].text;
+      }
+      annotatedText = built.trim();
+    }
+
+    return NextResponse.json({ rawText: annotatedText, language, duration });
   } catch (error) {
     console.error('Transcribe error:', error);
     return NextResponse.json(
