@@ -31,6 +31,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [liveText, setLiveText] = useState('');
   const [chunkCount, setChunkCount] = useState(0);
+  const [failedChunks, setFailedChunks] = useState(0);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -113,6 +114,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
       setState('done');
       setLiveText('');
       setChunkCount(0);
+      setFailedChunks(0);
       chunkIndexRef.current = 0;
       sessionIdRef.current = null;
       onDoneRef.current();
@@ -157,7 +159,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
           const data: { rawText: string; language: string; duration: number } = await tRes.json();
           if (data.rawText && sessionIdRef.current) {
             // 2. Guardar chunk en BD
-            await fetch(`/api/sessions/${sessionIdRef.current}/chunks`, {
+            const saveRes = await fetch(`/api/sessions/${sessionIdRef.current}/chunks`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -168,21 +170,37 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
               }),
             });
 
-            // Actualizar contexto y preview
-            const allChunks = contextRef.current
-              ? contextRef.current + ' ' + data.rawText
-              : data.rawText;
-            contextRef.current = allChunks.split(' ').slice(-150).join(' ');
-            setLiveText(allChunks);
-            setChunkCount((n) => n + 1);
+            if (saveRes.ok) {
+              // Actualizar contexto y preview
+              const allChunks = contextRef.current
+                ? contextRef.current + ' ' + data.rawText
+                : data.rawText;
+              contextRef.current = allChunks.split(' ').slice(-150).join(' ');
+              setLiveText(allChunks);
+              setChunkCount((n) => n + 1);
+            } else {
+              setFailedChunks((n) => n + 1);
+            }
+          } else {
+            setFailedChunks((n) => n + 1);
           }
+        } else {
+          setFailedChunks((n) => n + 1);
         }
       } catch {
-        // El chunk se pierde en memoria pero la sesion sigue en BD
+        setFailedChunks((n) => n + 1);
       }
 
       if (isRecordingRef.current) {
-        startChunkRef.current();
+        try {
+          startChunkRef.current();
+        } catch {
+          // Si falla al arrancar el siguiente chunk, finalizar con lo que hay
+          isRecordingRef.current = false;
+          streamRef.current?.getTracks().forEach((t) => t.stop());
+          streamRef.current = null;
+          await finalizeSession();
+        }
       } else {
         streamRef.current?.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
@@ -201,6 +219,7 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
   const startRecording = useCallback(async () => {
     setErrorMsg('');
     setLiveText('');
+    setFailedChunks(0);
     chunkIndexRef.current = 0;
     contextRef.current = '';
 
@@ -300,6 +319,9 @@ export function AudioRecorder({ onDone }: { onDone: () => void }) {
               Grabando
               {chunkCount > 0 && (
                 <span className="ml-1 text-gray-400">· {chunkCount} {chunkCount === 1 ? 'fragmento' : 'fragmentos'}</span>
+              )}
+              {failedChunks > 0 && (
+                <span className="ml-1 text-amber-500">· ⚠ {failedChunks} sin transcribir</span>
               )}
             </p>
             <p className="text-gray-900 text-3xl font-mono font-bold tabular-nums">
