@@ -1,16 +1,7 @@
 ﻿'use client';
 
-import { useEffect, useState, useRef } from 'react';
-
-interface TranscriptionItem {
-  id: number;
-  language: string | null;
-  outputLanguage: string | null;
-  durationSeconds: number | null;
-  formattedText: string;
-  rawText: string;
-  createdAt: string;
-}
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { TranscriptionItem } from '@/components/types';
 
 const LANG_LABELS: Record<string, string> = {
   spanish: 'Español', english: 'English',
@@ -27,12 +18,12 @@ const TRANSLATE_OPTIONS = [
 ];
 
 function langLabel(lang: string | null): string {
-  if (!lang) return '--';
+  if (!lang) return '—';
   return LANG_LABELS[lang.toLowerCase()] ?? lang;
 }
 
 function fmtDuration(s: number | null): string {
-  if (!s) return '--';
+  if (!s) return '—';
   const m = Math.floor(s / 60);
   const sec = s % 60;
   return `${m}:${String(sec).padStart(2, '0')} min`;
@@ -45,23 +36,22 @@ function fmtDate(iso: string): string {
   });
 }
 
-function truncate(text: string, max = 160): string {
+function truncate(text: string, max = 220): string {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
-// Formatea el texto mostrando etiquetas de persona con color
 function renderFormattedText(text: string) {
   const parts = text.split(/(\[Persona \d+\])/g);
   return parts.map((part, i) =>
     /\[Persona \d+\]/.test(part) ? (
-      <span key={i} className="text-orange-500 font-semibold text-xs">{part} </span>
+      <span key={i} className="font-semibold text-orange-600">{part} </span>
     ) : (
       <span key={i}>{part}</span>
     )
   );
 }
 
-export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
+export function TranscriptionList({ refreshKey, currentUsername }: { refreshKey: number; currentUsername?: string }) {
   const [items, setItems] = useState<TranscriptionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -79,19 +69,31 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
 
   useEffect(() => {
     setLoading(true);
-    fetch('/api/transcriptions')
+    fetch('/api/transcriptions', { cache: 'no-store' })
       .then((r) => r.json())
-      .then((data: TranscriptionItem[]) => { setItems(data); setLoading(false); })
+      .then((data: TranscriptionItem[]) => {
+        setItems(data);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, [refreshKey]);
 
-  // Autoajustar altura del textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [editText]);
+
+  const summary = useMemo(() => {
+    const totalMinutes = items.reduce((acc, item) => acc + (item.durationSeconds || 0), 0) / 60;
+    const pdfs = items.filter((item) => item.hasStoredPdf).length;
+    return {
+      conversations: items.length,
+      minutes: totalMinutes ? totalMinutes.toFixed(totalMinutes >= 10 ? 0 : 1) : '0',
+      pdfs,
+    };
+  }, [items]);
 
   const startEdit = (item: TranscriptionItem) => {
     setEditing(item.id);
@@ -99,7 +101,10 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
     setExpanded(item.id);
   };
 
-  const cancelEdit = () => { setEditing(null); setEditText(''); };
+  const cancelEdit = () => {
+    setEditing(null);
+    setEditText('');
+  };
 
   const saveEdit = async (id: number) => {
     setSaving(true);
@@ -110,9 +115,7 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
         body: JSON.stringify({ formattedText: editText }),
       });
       if (!res.ok) throw new Error('Error al guardar');
-      setItems((prev) =>
-        prev.map((i) => (i.id === id ? { ...i, formattedText: editText } : i))
-      );
+      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, formattedText: editText } : i)));
       setEditing(null);
       setEditText('');
     } catch {
@@ -152,9 +155,7 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
       }
       const data: { formattedText: string; outputLanguage: string } = await res.json();
       setItems((prev) =>
-        prev.map((i) =>
-          i.id === id ? { ...i, formattedText: data.formattedText, outputLanguage: data.outputLanguage } : i
-        )
+        prev.map((i) => (i.id === id ? { ...i, formattedText: data.formattedText, outputLanguage: data.outputLanguage } : i)),
       );
     } catch (err) {
       alert(`No se pudo traducir: ${(err as Error).message}`);
@@ -175,6 +176,7 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
       a.download = `transcripcion-${createdAt.split('T')[0]}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
+      setItems((prev) => prev.map((item) => (item.id === id ? { ...item, hasStoredPdf: true, pdfStoredAt: new Date().toISOString() } : item)));
     } catch {
       alert('No se pudo descargar el PDF.');
     } finally {
@@ -185,9 +187,7 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
   const cleanupChunks = async (id: number) => {
     setCleaningChunks(id);
     try {
-      const res = await fetch(`/api/transcriptions/${id}/cleanup`, {
-        method: 'POST',
-      });
+      const res = await fetch(`/api/transcriptions/${id}/cleanup`, { method: 'POST' });
       if (!res.ok) throw new Error('Error al borrar chunks');
       const data: { deletedChunks?: number } = await res.json();
       alert(
@@ -195,6 +195,7 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
           ? `Se borraron ${data.deletedChunks} ${data.deletedChunks === 1 ? 'chunk' : 'chunks'}.`
           : 'No había chunks pendientes para borrar.'
       );
+      setItems((prev) => prev.map((item) => (item.id === id ? { ...item, chunkCount: 0 } : item)));
     } catch {
       alert('No se pudieron borrar los chunks.');
     } finally {
@@ -205,9 +206,9 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
 
   if (loading) {
     return (
-      <div className="space-y-3 mt-8">
+      <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />
+          <div key={i} className="h-32 animate-pulse rounded-[24px] bg-slate-100" />
         ))}
       </div>
     );
@@ -215,23 +216,44 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
 
   if (items.length === 0) {
     return (
-      <div className="text-center py-20">
-        <svg className="w-10 h-10 mx-auto mb-3 text-gray-300" viewBox="0 0 24 24" fill="currentColor">
+      <div className="rounded-[28px] border border-dashed border-slate-200 bg-slate-50 px-6 py-16 text-center">
+        <svg className="mx-auto mb-4 h-12 w-12 text-slate-300" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
           <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
         </svg>
-        <p className="text-gray-500 text-sm">Sin grabaciones todavía</p>
-        <p className="text-gray-400 text-xs mt-1">Pulsa el botón para empezar</p>
+        <p className="text-base font-medium text-slate-700">Todavía no tienes conversaciones guardadas</p>
+        <p className="mt-2 text-sm text-slate-400">Cuando grabes la primera sesión, aparecerá aquí con sus opciones de PDF, edición y gestión manual de chunks.</p>
       </div>
     );
   }
 
   return (
-    <div className="mt-8">
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-4">
-        Historial &middot; {items.length} {items.length === 1 ? 'grabación' : 'grabaciones'}
-      </p>
-      <div className="space-y-3">
+    <div>
+      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-orange-500">Archivo personal</p>
+          <h3 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
+            {currentUsername ? `Conversaciones de ${currentUsername}` : 'Conversaciones'}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-slate-500">Tu historial privado incluye textos editables, PDFs persistidos y el control manual para eliminar chunks cuando ya no hagan falta.</p>
+        </div>
+        <div className="grid grid-cols-3 gap-3 self-stretch sm:self-auto">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Sesiones</p>
+            <p className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">{summary.conversations}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Minutos</p>
+            <p className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">{summary.minutes}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">PDFs</p>
+            <p className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">{summary.pdfs}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
         {items.map((item) => {
           const isExpanded = expanded === item.id;
           const isEditing = editing === item.id;
@@ -239,208 +261,167 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
           const isConfirmingCleanup = confirmCleanup === item.id;
 
           return (
-            <div
+            <article
               key={item.id}
-              className="bg-white border border-gray-200 hover:border-gray-300 rounded-xl transition-colors"
+              className="overflow-hidden rounded-[26px] border border-slate-200 bg-[linear-gradient(180deg,_rgba(255,255,255,1)_0%,_rgba(248,250,252,0.88)_100%)] shadow-[0_24px_70px_-52px_rgba(15,23,42,0.45)] transition hover:border-slate-300"
             >
-              {/* Cabecera */}
-              <div
-                className="flex items-start gap-4 p-5 cursor-pointer"
+              <button
+                type="button"
+                className="flex w-full items-start gap-4 p-5 text-left sm:p-6"
                 onClick={() => !isEditing && setExpanded(isExpanded ? null : item.id)}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span className="text-xs text-gray-500">{fmtDate(item.createdAt)}</span>
-                    {item.language && (
-                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
-                        {langLabel(item.language)} → {langLabel(item.outputLanguage)}
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-orange-200 bg-orange-50 text-sm font-semibold text-orange-600">
+                  #{item.id}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-slate-500">{fmtDate(item.createdAt)}</span>
+                    {item.ownerDisplayName && item.ownerUsername && item.ownerUsername !== currentUsername ? (
+                      <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs text-indigo-700">
+                        {item.ownerDisplayName} · @{item.ownerUsername}
                       </span>
-                    )}
-                    <span className="text-xs text-gray-400 font-mono">
+                    ) : null}
+                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-500">
+                      {langLabel(item.language)} → {langLabel(item.outputLanguage)}
+                    </span>
+                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-500">
                       {fmtDuration(item.durationSeconds)}
                     </span>
+                    {item.hasStoredPdf ? (
+                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs text-emerald-700">PDF guardado</span>
+                    ) : null}
+                    {typeof item.chunkCount === 'number' && item.chunkCount > 0 ? (
+                      <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs text-amber-700">{item.chunkCount} chunks</span>
+                    ) : null}
                   </div>
-                  <p className="text-sm text-gray-600 leading-relaxed">
-                    {truncate(item.formattedText)}
-                  </p>
+                  <p className="text-sm leading-6 text-slate-600">{truncate(item.formattedText)}</p>
                 </div>
-                <svg
-                  className={`shrink-0 w-4 h-4 text-gray-400 transition-transform mt-1 ${isExpanded ? 'rotate-180' : ''}`}
-                  fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                >
+                <svg className={`mt-1 h-5 w-5 shrink-0 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
-              </div>
+              </button>
 
-              {/* Detalle expandido */}
-              {isExpanded && (
-                <div className="border-t border-gray-200 px-5 pb-5 pt-4">
+              {isExpanded ? (
+                <div className="border-t border-slate-200 px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
                   {isEditing ? (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       <textarea
                         ref={textareaRef}
                         value={editText}
                         onChange={(e) => setEditText(e.target.value)}
-                        className="w-full bg-gray-50 border border-orange-400/30 rounded-lg p-3 text-sm text-gray-800 leading-relaxed resize-none focus:outline-none focus:border-orange-400/60 min-h-[120px]"
+                        className="min-h-[160px] w-full resize-none rounded-2xl border border-orange-200 bg-orange-50/40 p-4 text-sm leading-7 text-slate-800 outline-none transition focus:border-orange-300 focus:bg-white focus:ring-4 focus:ring-orange-100"
                       />
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <button
                           onClick={() => saveEdit(item.id)}
                           disabled={saving}
-                          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 text-white transition-all disabled:opacity-50"
+                          className="inline-flex items-center gap-2 rounded-2xl bg-orange-500 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-orange-400 disabled:opacity-50"
                         >
-                          {saving ? (
-                            <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                          ) : (
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
+                          {saving ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : null}
                           Guardar
                         </button>
                         <button
                           onClick={cancelEdit}
-                          className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-400 transition-all"
+                          className="rounded-2xl border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 transition hover:border-slate-300 hover:text-slate-800"
                         >
                           Cancelar
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                      {renderFormattedText(item.formattedText)}
-                    </div>
+                    <div className="whitespace-pre-wrap text-sm leading-7 text-slate-700">{renderFormattedText(item.formattedText)}</div>
                   )}
 
-                  {/* Acciones */}
-                  {!isEditing && (
-                    <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-200">
-                      {/* PDF */}
+                  {!isEditing ? (
+                    <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
                       <button
                         onClick={() => downloadPdf(item.id, item.createdAt)}
                         disabled={downloading === item.id}
-                        className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-orange-400/20 bg-orange-500/5 text-orange-500 hover:bg-orange-500/15 hover:border-orange-400/40 transition-all disabled:opacity-40"
+                        className="inline-flex items-center gap-2 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-orange-700 transition hover:border-orange-300 hover:bg-orange-100 disabled:opacity-40"
                       >
-                        {downloading === item.id ? (
-                          <div className="w-3 h-3 border border-orange-400/30 border-t-orange-400 rounded-full animate-spin" />
-                        ) : (
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                        )}
+                        {downloading === item.id ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-orange-300 border-t-orange-700" /> : null}
                         PDF
                       </button>
 
                       {isConfirmingCleanup ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-amber-600">¿Borrar chunks?</span>
+                        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                          <span>¿Borrar chunks de respaldo?</span>
                           <button
                             onClick={() => cleanupChunks(item.id)}
                             disabled={cleaningChunks === item.id}
-                            className="text-xs font-medium px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-400/30 text-amber-700 hover:bg-amber-500/25 transition-all disabled:opacity-50"
+                            className="rounded-xl bg-amber-500 px-3 py-1.5 font-semibold text-white transition hover:bg-amber-400 disabled:opacity-50"
                           >
                             {cleaningChunks === item.id ? 'Borrando…' : 'Sí, borrar'}
                           </button>
-                          <button
-                            onClick={() => setConfirmCleanup(null)}
-                            className="text-xs text-gray-600 hover:text-gray-400 transition-all"
-                          >
-                            No
-                          </button>
+                          <button onClick={() => setConfirmCleanup(null)} className="font-semibold text-amber-700 transition hover:text-amber-900">Cancelar</button>
                         </div>
                       ) : (
                         <button
                           onClick={() => setConfirmCleanup(item.id)}
                           disabled={cleaningChunks === item.id}
-                          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-amber-400/25 bg-amber-500/5 text-amber-700 hover:bg-amber-500/15 hover:border-amber-400/40 transition-all disabled:opacity-40"
+                          className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 transition hover:border-amber-300 hover:bg-amber-100 disabled:opacity-40"
                         >
-                          {cleaningChunks === item.id ? (
-                            <div className="w-3 h-3 border border-amber-500/30 border-t-amber-600 rounded-full animate-spin" />
-                          ) : (
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          )}
+                          {cleaningChunks === item.id ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-amber-300 border-t-amber-700" /> : null}
                           Borrar chunks
                         </button>
                       )}
 
-                      {/* Editar */}
                       <button
                         onClick={() => startEdit(item)}
-                        className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-400 transition-all"
+                        className="rounded-2xl border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
                       >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
                         Editar
                       </button>
 
-                      {/* Traducir */}
                       <div className="relative">
                         <button
                           onClick={() => setTranslateOpen(translateOpen === item.id ? null : item.id)}
                           disabled={translating === item.id}
-                          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-400 transition-all disabled:opacity-40"
+                          className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:opacity-40"
                         >
-                          {translating === item.id ? (
-                            <div className="w-3 h-3 border border-gray-300 border-t-gray-600 rounded-full animate-spin" />
-                          ) : (
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                            </svg>
-                          )}
-                          {translating === item.id ? 'Traduciendo…' : 'Traducir'}
+                          {translating === item.id ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" /> : null}
+                          Traducir
                         </button>
-                        {translateOpen === item.id && (
-                          <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[130px]">
+                        {translateOpen === item.id ? (
+                          <div className="absolute left-0 top-full z-50 mt-2 min-w-[160px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
                             {TRANSLATE_OPTIONS.map((opt) => (
                               <button
                                 key={opt.code}
                                 onClick={() => translateItem(item.id, opt.code)}
-                                className="w-full text-left px-3 py-1.5 text-xs text-gray-600 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                                className="block w-full px-4 py-2.5 text-left text-xs font-medium text-slate-600 transition hover:bg-orange-50 hover:text-orange-700"
                               >
                                 {opt.label}
                               </button>
                             ))}
                           </div>
-                        )}
+                        ) : null}
                       </div>
 
-                      {/* Borrar */}
                       {isConfirmingDelete ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-red-400">¿Seguro?</span>
+                        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                          <span>¿Seguro que quieres borrar esta conversación?</span>
                           <button
                             onClick={() => deleteItem(item.id)}
                             disabled={deleting === item.id}
-                            className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-600/20 border border-red-500/30 text-red-400 hover:bg-red-600/30 transition-all disabled:opacity-50"
+                            className="rounded-xl bg-red-600 px-3 py-1.5 font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
                           >
                             {deleting === item.id ? 'Borrando…' : 'Sí, borrar'}
                           </button>
-                          <button
-                            onClick={() => setConfirmDelete(null)}
-                            className="text-xs text-gray-600 hover:text-gray-400 transition-all"
-                          >
-                            No
-                          </button>
+                          <button onClick={() => setConfirmDelete(null)} className="font-semibold text-red-700 transition hover:text-red-900">Cancelar</button>
                         </div>
                       ) : (
                         <button
                           onClick={() => setConfirmDelete(item.id)}
-                          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-400/40 transition-all"
+                          className="rounded-2xl border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
                         >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
                           Borrar
                         </button>
                       )}
                     </div>
-                  )}
+                  ) : null}
                 </div>
-              )}
-            </div>
+              ) : null}
+            </article>
           );
         })}
       </div>
