@@ -11,7 +11,7 @@ export async function POST(
   const transcriptionId = parseInt(id, 10);
 
   if (isNaN(transcriptionId)) {
-    return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+    return NextResponse.json({ error: 'ID invalido' }, { status: 400 });
   }
 
   const db = getDb();
@@ -22,7 +22,7 @@ export async function POST(
     .where(eq(transcriptions.id, transcriptionId));
 
   if (!transcription) {
-    return NextResponse.json({ error: 'Transcripción no encontrada' }, { status: 404 });
+    return NextResponse.json({ error: 'Transcripcion no encontrada' }, { status: 404 });
   }
 
   const [session] = await db
