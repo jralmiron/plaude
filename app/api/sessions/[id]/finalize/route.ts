@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { eq, asc } from 'drizzle-orm';
 import Groq from 'groq-sdk';
 import { getDb } from '@/lib/db';
-import { sessions, audioChunks, transcriptions } from '@/lib/schema';
+import { sessions, transcriptions } from '@/lib/schema';
 
 export const maxDuration = 60;
 
@@ -126,8 +126,6 @@ export async function POST(
     .set({ status: 'done', transcriptionId: saved.id })
     .where(eq(sessions.id, sessionId));
 
-  // Limpiar chunks — ya están fusionados en la transcripción final
-  await db.delete(audioChunks).where(eq(audioChunks.sessionId, sessionId));
-
   return NextResponse.json({ transcriptionId: saved.id, success: true });
 }
+

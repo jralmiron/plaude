@@ -71,6 +71,8 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
   const [deleting, setDeleting] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [downloading, setDownloading] = useState<number | null>(null);
+  const [cleaningChunks, setCleaningChunks] = useState<number | null>(null);
+  const [confirmCleanup, setConfirmCleanup] = useState<number | null>(null);
   const [translating, setTranslating] = useState<number | null>(null);
   const [translateOpen, setTranslateOpen] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -180,6 +182,27 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
     }
   };
 
+  const cleanupChunks = async (id: number) => {
+    setCleaningChunks(id);
+    try {
+      const res = await fetch(`/api/transcriptions/${id}/cleanup`, {
+        method: 'POST',
+      });
+      if (!res.ok) throw new Error('Error al borrar chunks');
+      const data: { deletedChunks?: number } = await res.json();
+      alert(
+        data.deletedChunks && data.deletedChunks > 0
+          ? `Se borraron ${data.deletedChunks} ${data.deletedChunks === 1 ? 'chunk' : 'chunks'}.`
+          : 'No había chunks pendientes para borrar.'
+      );
+    } catch {
+      alert('No se pudieron borrar los chunks.');
+    } finally {
+      setCleaningChunks(null);
+      setConfirmCleanup(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-3 mt-8">
@@ -213,6 +236,7 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
           const isExpanded = expanded === item.id;
           const isEditing = editing === item.id;
           const isConfirmingDelete = confirmDelete === item.id;
+          const isConfirmingCleanup = confirmCleanup === item.id;
 
           return (
             <div
@@ -306,6 +330,40 @@ export function TranscriptionList({ refreshKey }: { refreshKey: number }) {
                         )}
                         PDF
                       </button>
+
+                      {isConfirmingCleanup ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-amber-600">¿Borrar chunks?</span>
+                          <button
+                            onClick={() => cleanupChunks(item.id)}
+                            disabled={cleaningChunks === item.id}
+                            className="text-xs font-medium px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-400/30 text-amber-700 hover:bg-amber-500/25 transition-all disabled:opacity-50"
+                          >
+                            {cleaningChunks === item.id ? 'Borrando…' : 'Sí, borrar'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmCleanup(null)}
+                            className="text-xs text-gray-600 hover:text-gray-400 transition-all"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmCleanup(item.id)}
+                          disabled={cleaningChunks === item.id}
+                          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-amber-400/25 bg-amber-500/5 text-amber-700 hover:bg-amber-500/15 hover:border-amber-400/40 transition-all disabled:opacity-40"
+                        >
+                          {cleaningChunks === item.id ? (
+                            <div className="w-3 h-3 border border-amber-500/30 border-t-amber-600 rounded-full animate-spin" />
+                          ) : (
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          )}
+                          Borrar chunks
+                        </button>
+                      )}
 
                       {/* Editar */}
                       <button
