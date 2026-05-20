@@ -1,50 +1,129 @@
+import { asc, eq, sql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { ensureAppBootstrap } from '@/lib/bootstrap';
+import {
+  buildPermissionsForUser,
+  hashPassword,
+  normalizeUsername,
+  requireUser,
+  sanitizeBoolean,
+  validatePasswordStrength,
+  validateRole,
+} from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { users } from '@/lib/schema';
+import { pdfDocuments, transcriptions, users } from '@/lib/schema';
 
-async function hashPassword(password: string): Promise<string> {
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const saltHex = Array.from(salt).map((b) => b.toString(16).padStart(2, '0')).join('');
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 100_000, hash: 'SHA-256' }, key, 256);
-  const hashHex = Array.from(new Uint8Array(bits)).map((b) => b.toString(16).padStart(2, '0')).join('');
-  return `${saltHex}:${hashHex}`;
+function permissionsFromBody(role: 'admin' | 'user', raw: unknown) {
+  const permissionMap = typeof raw === 'object' && raw ? (raw as Record<string, unknown>) : {};
+  if (role === 'admin') {
+    return {
+      canManageUsers: sanitizeBoolean(permissionMap.manageUsers, true),
+      canManagePasswords: sanitizeBoolean(permissionMap.viewPasswords, true),
+      canViewAllConversations: sanitizeBoolean(permissionMap.exportPdfs, true),
+    };
+  }
+  return {
+    canManageUsers: false,
+    canManagePasswords: false,
+    canViewAllConversations: false,
+  };
 }
 
 export async function GET() {
+  await ensureAppBootstrap();
+  const auth = await requireUser({ adminOnly: true });
+  if (auth.response) return auth.response;
+
   const db = getDb();
-  const result = await db
-    .select({ id: users.id, username: users.username, role: users.role, createdAt: users.createdAt })
+  const rows = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      displayName: users.displayName,
+      role: users.role,
+      canManageUsers: users.canManageUsers,
+      canManagePasswords: users.canManagePasswords,
+      canViewAllConversations: users.canViewAllConversations,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt,
+      conversationCount: sql<number>`count(distinct ${transcriptions.id})`,
+      pdfCount: sql<number>`count(distinct ${pdfDocuments.id})`,
+      lastActiveAt: sql<string | null>`max(${transcriptions.updatedAt})`,
+    })
     .from(users)
-    .orderBy(users.createdAt);
-  return NextResponse.json(result);
+    .leftJoin(transcriptions, eq(transcriptions.userId, users.id))
+    .leftJoin(pdfDocuments, eq(pdfDocuments.userId, users.id))
+    .groupBy(users.id)
+    .orderBy(asc(users.createdAt));
+
+  return NextResponse.json(
+    rows.map((entry) => ({
+      id: entry.id,
+      username: entry.username,
+      displayName: entry.displayName,
+      role: entry.role,
+      createdAt: entry.createdAt,
+      permissions: buildPermissionsForUser(entry),
+      conversationCount: Number(entry.conversationCount ?? 0),
+      pdfCount: Number(entry.pdfCount ?? 0),
+      lastActiveAt: entry.lastActiveAt,
+      passwordManaged: true,
+    }))
+  );
 }
 
 export async function POST(request: Request) {
-  const { username, password, role = 'user' } = await request.json().catch(() => ({}));
+  await ensureAppBootstrap();
+  const auth = await requireUser({ adminOnly: true });
+  if (auth.response) return auth.response;
+
+  const body = await request.json().catch(() => ({}));
+  const username = typeof body.username === 'string' ? normalizeUsername(body.username) : '';
+  const password = typeof body.password === 'string' ? body.password : '';
+  const role = typeof body.role === 'string' && validateRole(body.role) ? body.role : 'user';
+  const displayName =
+    typeof body.displayName === 'string' && body.displayName.trim() ? body.displayName.trim() : username;
 
   if (!username || !password) {
-    return NextResponse.json({ error: 'username y password requeridos' }, { status: 400 });
+    return NextResponse.json({ error: 'username and password are required' }, { status: 400 });
   }
-  if (!['admin', 'user'].includes(role)) {
-    return NextResponse.json({ error: 'role debe ser admin o user' }, { status: 400 });
+  if (!validatePasswordStrength(password)) {
+    return NextResponse.json({ error: 'Password must be between 8 and 128 characters' }, { status: 400 });
   }
 
   const db = getDb();
-  const passwordHash = await hashPassword(password);
-  try {
-    const [user] = await db
-      .insert(users)
-      .values({ username, passwordHash, role })
-      .returning({ id: users.id, username: users.username, role: users.role, createdAt: users.createdAt });
-    return NextResponse.json(user, { status: 201 });
-  } catch {
-    // unique constraint → usuario ya existe
-    const existing = await db.select().from(users).where(eq(users.username, username));
-    if (existing.length > 0) {
-      return NextResponse.json({ error: 'El usuario ya existe' }, { status: 409 });
-    }
-    return NextResponse.json({ error: 'Error al crear usuario' }, { status: 500 });
+  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.username, username)).limit(1);
+  if (existing) {
+    return NextResponse.json({ error: 'User already exists' }, { status: 409 });
   }
+
+  const permissionFlags = permissionsFromBody(role, body.permissions);
+  const [created] = await db
+    .insert(users)
+    .values({
+      username,
+      displayName,
+      passwordHash: await hashPassword(password),
+      passwordPlain: '',
+      role,
+      ...permissionFlags,
+      updatedAt: new Date(),
+    })
+    .returning();
+
+  return NextResponse.json(
+    {
+      id: created.id,
+      username: created.username,
+      displayName: created.displayName,
+      role: created.role,
+      createdAt: created.createdAt,
+      permissions: buildPermissionsForUser(created),
+      conversationCount: 0,
+      pdfCount: 0,
+      lastActiveAt: null,
+      passwordManaged: true,
+    },
+    { status: 201 }
+  );
 }
