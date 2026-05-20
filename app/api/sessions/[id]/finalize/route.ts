@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { eq, asc } from 'drizzle-orm';
 import Groq from 'groq-sdk';
 import { getDb } from '@/lib/db';
-import { sessions, transcriptions } from '@/lib/schema';
+import { sessions, audioChunks, transcriptions } from '@/lib/schema';
 
 export const maxDuration = 60;
 
