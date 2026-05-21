@@ -76,10 +76,7 @@ export function AccountSecurityCard({ user, refreshKey = 0 }: AccountSecurityCar
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-orange-500">Mi cuenta</p>
-            <h3 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">Perfil y acceso</h3>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-              Gestiona tu contraseña y consulta el estado de tus conversaciones, PDFs persistidos y chunks aún disponibles para respaldo.
-            </p>
+            <h3 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">{user.displayName || user.username}</h3>
           </div>
           <div className="rounded-2xl border border-orange-200 bg-orange-50 px-3 py-2 text-right">
             <p className="text-[11px] uppercase tracking-[0.22em] text-orange-500">Usuario</p>

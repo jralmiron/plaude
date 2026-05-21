@@ -28,6 +28,7 @@ async function bootstrapOnce() {
 
   await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name varchar(120) NOT NULL DEFAULT ''`);
   await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_plain text NOT NULL DEFAULT ''`);
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS can_manage_users boolean NOT NULL DEFAULT false`);
   await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS can_manage_passwords boolean NOT NULL DEFAULT false`);
   await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS can_view_all_conversations boolean NOT NULL DEFAULT false`);
   await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at timestamp NOT NULL DEFAULT now()`);

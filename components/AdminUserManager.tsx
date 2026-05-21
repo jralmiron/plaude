@@ -205,11 +205,8 @@ export function AdminUserManager({ currentUser }: { currentUser: CurrentUser }) 
 
   return (
     <AppFrame
-      eyebrow="Master admin"
-      title={<HermesWordmark suffix="panel de control" />}
-      subtitle={
-        <>Juanra, desde aquí gobiernas el acceso completo: altas, bajas, roles, permisos operativos y reseteo seguro de contraseñas.</>
-      }
+      eyebrow="Administración"
+      title={<HermesWordmark suffix="usuarios" />}
       actions={
         <>
           <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-950">
@@ -232,7 +229,7 @@ export function AdminUserManager({ currentUser }: { currentUser: CurrentUser }) 
           <form onSubmit={createUser} className="rounded-[32px] border border-white/80 bg-white/92 p-6 shadow-[0_24px_80px_-44px_rgba(15,23,42,0.28)] backdrop-blur sm:p-7">
             <div className="mb-5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-orange-500">Nuevo usuario</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">Alta controlada</h2>
+              <h2 className="mt-2 text-xl font-semibold tracking-[-0.04em] text-slate-950">Crear cuenta</h2>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -253,8 +250,9 @@ export function AdminUserManager({ currentUser }: { currentUser: CurrentUser }) 
                 <label className="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">Contraseña inicial</label>
                 <input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-orange-300 focus:bg-white focus:ring-4 focus:ring-orange-100" />
               </div>
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm leading-6 text-emerald-800">
-                La contraseña se guarda solo como hash seguro. El panel admin puede resetearla, pero no verla después.
+              <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-700">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Contraseña cifrada · no recuperable
               </div>
             </div>
 
@@ -286,20 +284,23 @@ export function AdminUserManager({ currentUser }: { currentUser: CurrentUser }) 
           </form>
 
           <section className="rounded-[32px] border border-slate-200/80 bg-slate-950 p-6 text-white shadow-[0_24px_90px_-44px_rgba(15,23,42,0.8)] sm:p-7">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-orange-200">Master controls</p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">Gobierno completo de Hermes</h2>
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-orange-200">Resumen</p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-orange-100">Tu sesión</p>
-                <p className="mt-2 text-lg font-semibold">{currentUser.username}</p>
+                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Sesión activa</p>
+                <p className="mt-2 text-base font-semibold">{currentUser.displayName || currentUser.username}</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-orange-100">Usuarios visibles</p>
-                <p className="mt-2 text-lg font-semibold">{users.length}</p>
+                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Total usuarios</p>
+                <p className="mt-2 text-base font-semibold">{users.length}</p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 sm:col-span-2">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-orange-100">Recordatorio de seguridad</p>
-                <p className="mt-2 text-sm leading-6 text-slate-300">Las contraseñas ya no se almacenan de forma recuperable. Juanra puede crear o resetear accesos, pero no consultar la contraseña actual de nadie.</p>
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Administradores</p>
+                <p className="mt-2 text-base font-semibold">{users.filter((u) => u.role === 'admin').length}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Conversaciones totales</p>
+                <p className="mt-2 text-base font-semibold">{users.reduce((acc, u) => acc + (u.conversationCount ?? 0), 0)}</p>
               </div>
             </div>
           </section>
@@ -308,8 +309,8 @@ export function AdminUserManager({ currentUser }: { currentUser: CurrentUser }) 
         <section className="rounded-[32px] border border-white/80 bg-white/92 p-6 shadow-[0_24px_80px_-44px_rgba(15,23,42,0.28)] backdrop-blur sm:p-7">
           <div className="mb-5 flex items-end justify-between gap-4">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-orange-500">Usuarios y permisos</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">Matriz operativa</h2>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-orange-500">Usuarios</p>
+              <h2 className="mt-2 text-xl font-semibold tracking-[-0.04em] text-slate-950">Accesos y permisos</h2>
             </div>
             <button type="button" onClick={() => void load()} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-950">
               Refrescar
@@ -417,24 +418,18 @@ export function AdminUserManager({ currentUser }: { currentUser: CurrentUser }) 
                             </div>
                           </div>
 
-                          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4">
-                            <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-600">Contraseña protegida</p>
-                            <p className="mt-2 text-sm text-slate-900">No recuperable. Si hace falta, usa “Editar” para definir una nueva contraseña.</p>
-                          </div>
+
                         </div>
 
                         <div>
-                          <p className="mb-3 text-xs font-medium uppercase tracking-[0.22em] text-slate-400">Permisos vigentes</p>
+                          <p className="mb-3 text-xs font-medium uppercase tracking-[0.22em] text-slate-400">Permisos</p>
                           <div className="grid gap-2 sm:grid-cols-2">
                             {PERMISSION_FIELDS.map((permission) => (
-                              <div key={permission.key} className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm ${permissionSource[permission.key] ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-400'}`}>
+                              <div key={permission.key} className={`flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-sm ${permissionSource[permission.key] ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-400'}`}>
+                                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${permissionSource[permission.key] ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                                 <span>{permission.label}</span>
-                                <span className="font-semibold">{permissionSource[permission.key] ? 'Sí' : 'No'}</span>
                               </div>
                             ))}
-                          </div>
-                          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
-                            Última actividad conocida: <span className="font-medium text-slate-700">{fmtDate(user.lastActiveAt)}</span>
                           </div>
                         </div>
                       </div>

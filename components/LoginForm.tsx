@@ -1,7 +1,24 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+const EyeIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+const EyeOffIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </svg>
+);
+
+const SHOW_DURATION_MS = 30_000;
 
 export function LoginForm() {
   const router = useRouter();
@@ -9,6 +26,39 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearTimers = () => {
+    if (hideTimerRef.current) { clearTimeout(hideTimerRef.current); hideTimerRef.current = null; }
+    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
+  };
+
+  const togglePassword = () => {
+    if (showPassword) {
+      clearTimers();
+      setShowPassword(false);
+      setCountdown(0);
+      return;
+    }
+    setShowPassword(true);
+    setCountdown(30);
+    countdownRef.current = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) { clearTimers(); setShowPassword(false); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+    hideTimerRef.current = setTimeout(() => {
+      setShowPassword(false);
+      setCountdown(0);
+      clearTimers();
+    }, SHOW_DURATION_MS);
+  };
+
+  useEffect(() => () => clearTimers(), []);
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -39,11 +89,10 @@ export function LoginForm() {
   return (
     <div className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/80 shadow-[0_40px_120px_-32px_rgba(15,23,42,0.24)] backdrop-blur-xl">
       <div className="border-b border-orange-100 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-400 px-8 py-8 text-white">
-        <p className="text-xs font-semibold uppercase tracking-[0.35em] text-white/80">Acceso seguro</p>
-        <h2 className="mt-3 text-3xl font-black tracking-tight">Entrar en Hermes</h2>
+        <p className="text-xs font-semibold uppercase tracking-[0.35em] text-white/80">Bienvenid@</p>
+        <h2 className="mt-3 text-3xl font-black tracking-tight">Hermes</h2>
         <p className="mt-2 text-sm leading-6 text-white/80">
-          Cada usuario entra con su cuenta privada y solo ve sus conversaciones, sus PDFs y
-          su historial.
+          INTRODUCE TU USUARIO Y TU CONTRASEÑA
         </p>
       </div>
 
@@ -63,18 +112,34 @@ export function LoginForm() {
         </div>
 
         <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
-            Contraseña
+          <label className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
+            <span>Contraseña</span>
+            {showPassword && countdown > 0 ? (
+              <span className="text-[10px] font-normal normal-case tracking-normal text-orange-400">
+                Se oculta en {countdown}s
+              </span>
+            ) : null}
           </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete="current-password"
-            required
-            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-orange-300 focus:bg-white focus:ring-4 focus:ring-orange-100"
-            placeholder="••••••••••••"
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="current-password"
+              required
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 pr-12 text-sm text-slate-900 outline-none transition focus:border-orange-300 focus:bg-white focus:ring-4 focus:ring-orange-100"
+              placeholder="••••••••••••"
+            />
+            <button
+              type="button"
+              onClick={togglePassword}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-xl p-1.5 text-slate-400 transition hover:text-slate-700"
+              tabIndex={-1}
+              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+            >
+              {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
+          </div>
         </div>
 
         {error ? (

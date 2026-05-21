@@ -19,7 +19,11 @@ export async function POST(request: Request) {
 
   const db = getDb();
   const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+  if (!user) {
+    return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+  }
+  const passwordOk = await verifyPassword(password, user.passwordHash);
+  if (!passwordOk) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
   }
 

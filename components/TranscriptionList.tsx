@@ -263,7 +263,7 @@ export function TranscriptionList({ refreshKey, currentUsername }: { refreshKey:
           return (
             <article
               key={item.id}
-              className="overflow-hidden rounded-[26px] border border-slate-200 bg-[linear-gradient(180deg,_rgba(255,255,255,1)_0%,_rgba(248,250,252,0.88)_100%)] shadow-[0_24px_70px_-52px_rgba(15,23,42,0.45)] transition hover:border-slate-300"
+              className="rounded-[26px] border border-slate-200 bg-[linear-gradient(180deg,_rgba(255,255,255,1)_0%,_rgba(248,250,252,0.88)_100%)] shadow-[0_24px_70px_-52px_rgba(15,23,42,0.45)] transition hover:border-slate-300"
             >
               <button
                 type="button"
