@@ -1,25 +1,31 @@
 ﻿'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
-import type { CurrentUser, MeResponse } from '@/components/types';
+import { useSessionProfile } from '@/components/useSessionProfile';
+import type { CurrentUser } from '@/components/types';
 
 interface AccountSecurityCardProps {
   user: CurrentUser;
-  sessionData?: MeResponse | null;
+  refreshKey?: number;
 }
 
 function statValue(value?: number) {
   return typeof value === 'number' ? value.toLocaleString('es-ES') : '—';
 }
 
-export function AccountSecurityCard({ user, sessionData }: AccountSecurityCardProps) {
+export function AccountSecurityCard({ user, refreshKey = 0 }: AccountSecurityCardProps) {
   const router = useRouter();
+  const { data: sessionData, refresh: refreshStats } = useSessionProfile();
   const [currentPassword, setCurrentPassword] = useState('');
   const [nextPassword, setNextPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    if (refreshKey > 0) void refreshStats();
+  }, [refreshKey, refreshStats]);
 
   const stats = useMemo(
     () => [

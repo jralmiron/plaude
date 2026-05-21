@@ -6,16 +6,16 @@ import { useState } from 'react';
 import { AppFrame, HermesWordmark } from '@/components/AppFrame';
 import { AccountSecurityCard } from '@/components/AccountSecurityCard';
 import { RecorderApp } from '@/components/RecorderApp';
-import type { CurrentUser, MeResponse } from '@/components/types';
+import type { CurrentUser } from '@/components/types';
 
 interface DashboardViewProps {
   user: CurrentUser;
-  sessionData?: MeResponse | null;
 }
 
-export function DashboardView({ user, sessionData }: DashboardViewProps) {
+export function DashboardView({ user }: DashboardViewProps) {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [statsKey, setStatsKey] = useState(0);
 
   const logout = async () => {
     setLoggingOut(true);
@@ -61,7 +61,7 @@ export function DashboardView({ user, sessionData }: DashboardViewProps) {
       }
     >
       <div className="space-y-6">
-        <AccountSecurityCard user={user} sessionData={sessionData} />
+        <AccountSecurityCard user={user} refreshKey={statsKey} />
 
         <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
           <div className="rounded-[32px] border border-white/80 bg-white/92 p-6 shadow-[0_24px_80px_-42px_rgba(15,23,42,0.28)] backdrop-blur sm:p-8">
@@ -78,7 +78,7 @@ export function DashboardView({ user, sessionData }: DashboardViewProps) {
                 <p className="mt-1 text-sm font-semibold text-slate-900">Solo tú</p>
               </div>
             </div>
-            <RecorderApp currentUsername={user.username} />
+            <RecorderApp currentUsername={user.username} onDone={() => setStatsKey((k) => k + 1)} />
           </div>
 
           <aside className="grid gap-6">
